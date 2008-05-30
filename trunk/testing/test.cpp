@@ -4,12 +4,15 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <string>
+#include <sstream>
 
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
@@ -130,14 +133,14 @@ public:
 	}
 
 	template<typename T1, typename T2>
-	void readRow( boost::tuples::cons<T1, T2> &t, index=0 )
+	void readRow( boost::tuples::cons<T1, T2> &t, size_t index=0 )
 	{
 		t.head = getField<T1>( index );
 		readRow( t.tail, index + 1 );
 	}
 
 	template<typename T>
-	void readRow( boost::tuples::const<T, boost::tuples::null_type> &t, index=0 )
+	void readRow( boost::tuples::cons<T, boost::tuples::null_type> &t, size_t index=0 )
 	{
 		t.head = getField<T>( index );
 	}
@@ -190,10 +193,10 @@ public:
 	void startNode( const std::string &nodeName );
 
 	template<typename T>
-	void startNode( const std::string &nodeName, std::string &attrName, const T &attrValue );
+	void startNode( const std::string &nodeName, const std::string &attrName, const T &attrValue );
 
 	template<typename T1, typename T2>
-	void startNode( const std::string &nodeName, const std::string[] &attrNames, const boost::tuples::cons<T1, T2> &attrValueTuple );
+	void startNode( const std::string &nodeName, const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple );
 
 	void endNode( const std::string &nodeName );
 
@@ -204,27 +207,61 @@ private:
 
 void XMLWriter::startNode( const std::string &nodeName )
 {
-	outStream << "<" << nodeName << ">";
+	m_outStream << "<" << nodeName << ">";
 }
 
+template<typename T>
 void XMLWriter::startNode( const std::string &nodeName, const std::string &attrName, const T &attrValue )
 {
-	outStream << "<" << nodeName << " " << attrName << "=\"" << attrValue << "\">";
+	m_outStream << "<" << nodeName << " " << attrName << "=\"" << attrValue << "\">";
 }
 
+template<typename T>
+void renderTags(
+    const boost::tuples::cons<T, boost::tuples::null_type> &tuple,
+    const std::string attrNames[],
+    std::vector<std::string> &tags,
+    int index )
+{
+  std::stringstream ss;
+  ss << attrNames[index] << "=\"" << tuple.head << "\"";
+  tags.push_back( ss.str() );
+}
+
+template<typename T1, typename T2>
+void renderTags(
+    const boost::tuples::cons<T1, T2> &tuple,
+    const std::string attrNames[],
+    std::vector<std::string> &tags,
+    int index )
+{
+  std::stringstream ss;
+  ss << attrNames[index] << "=\"" << tuple.head << "\"";
+  tags.push_back( ss.str() );
+
+  renderTags( tuple.tail, attrNames, tags, index + 1 );
+}
+
+template<typename T1, typename T2>
 void XMLWriter::startNode( const std::string &nodeName, const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple )
 {
-	// Do something clever here
+  std::vector<std::string> tags;
+  
+  renderTags( attrValueTuple, attrNames, tags, 0 );
+
+  m_outStream << "<" << nodeName << " " << boost::algorithm::join( tags, " " ) << ">";
 }
 
 void XMLWriter::endNode( const std::string &nodeName )
 {
-	outStream << "</" << nodeName << ">";
+	m_outStream << "</" << nodeName << ">";
 }
 
 void map( double minLat, double maxLat, double minLon, double maxLon )
 {
 	std::ofstream opFile( "test_result.txt" );
+	XMLWriter xmlWriter( opFile );
+
 	DbConnection dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
 
 	dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_node_ids( id BIGINT, PRIMARY KEY(id) )" );
@@ -268,11 +305,11 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
 			bool,
 			std::string> nodeData;
 
-		db.readRow( nodeData );
+		dbConn.readRow( nodeData );
 
 		xmlWriter.startNode( "node", nodeAttrNames, nodeData );
 
-		std::string tagString = db.getField<std::string>( 5 );
+		std::string tagString = dbConn.getField<std::string>( 5 );
 
 		std::vector<std::string> tags;
 		boost::algorithm::split( tags, tagString, boost::algorithm::is_any_of( ";" ) );
@@ -292,7 +329,7 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
 				{
 					const std::string tagAttrNames[] = { "k", "v" };
 					xmlWriter.startNode( "tag", tagAttrNames, boost::make_tuple( keyValue[0], keyValue[1] ) );
-					xmlWriter.endNode();
+					xmlWriter.endNode( "tag" );
 				}
 			}
 		}
@@ -334,13 +371,14 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
 
 	do
 	{
-		typedef boost::tuple<
+		boost::tuple<
 			boost::uint64_t,
 			bool,
 			std::string,
 			boost::uint64_t> wayData;
 
-		db.readRow( wayData );
+		dbConn.readRow( wayData );
+		boost::uint64_t wayId = wayData.get<0>();
 
 		const std::string wayAttrNames[] = { "id", "visible", "timestamp", "user" };
 
@@ -360,9 +398,9 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
 
 		for ( ; tags.first != tags.second; tags.first++ )
 		{
-			const std::string tagAttrNames[] = { "k", "v", "version" }
-			xmlWriter.startNode( "tag", tagAttrNames, tags.first );
-			xmlWriter.endNode();
+		        const std::string tagAttrNames[] = { "k", "v", "version" };
+			xmlWriter.startNode( "tag", tagAttrNames, *tags.first );
+			xmlWriter.endNode( "tag" );
 		}
 		
 		xmlWriter.endNode( "way" );
