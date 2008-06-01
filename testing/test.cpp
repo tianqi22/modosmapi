@@ -26,21 +26,21 @@
 // Update:    PUT <objtype>/<id> + xml   - returns nothing
 // Delete:    DELETE <objtype>/<id>      - returns nothing
 
-// GET /api/0.5/map?bbox=<left>,<bottom>,<right>,<top>
-// GET /api/0.5/trackpoints?bbox=<left>,<bottom>,<right>,<top>&page=<pagenumber>
-// GET /api/0.5/<objtype>/<id>/history
-// GET /api/0.5/<objtype>s?<objtype>s=<id>[,<id>]
-// GET /api/0.5/node/<id>/ways
-// GET /api/0.5/<objtype>/<id>/relations
-// GET /api/0.5/<objtype>/<id>/full
-// GET /api/0.5/changes?hours=1&zoom=16
-// GET /api/0.5/ways/search?type=<type>&value=<value>
-// GET /api/0.5/relations/search?type=<type>&value=<value>
-// GET /api/0.5/search?type=<type>&value=<value>
+// GET  /api/0.5/map?bbox=<left>,<bottom>,<right>,<top>
+// GET  /api/0.5/trackpoints?bbox=<left>,<bottom>,<right>,<top>&page=<pagenumber>
+// GET  /api/0.5/<objtype>/<id>/history
+// GET  /api/0.5/<objtype>s?<objtype>s=<id>[,<id>]
+// GET  /api/0.5/node/<id>/ways
+// GET  /api/0.5/<objtype>/<id>/relations
+// GET  /api/0.5/<objtype>/<id>/full
+// GET  /api/0.5/changes?hours=1&zoom=16
+// GET  /api/0.5/ways/search?type=<type>&value=<value>
+// GET  /api/0.5/relations/search?type=<type>&value=<value>
+// GET  /api/0.5/search?type=<type>&value=<value>
 // POST /api/0.5/gpx/create
-// GET /api/0.5/gpx/<id>/details
-// GET /api/0.5/gpx/<id>/data
-// GET /api/0.5/user/preferences
+// GET  /api/0.5/gpx/<id>/details
+// GET  /api/0.5/gpx/<id>/data
+// GET  /api/0.5/user/preferences
 
 
 
@@ -295,18 +295,17 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_way_ids( id BIGINT, PRIMARY KEY(id) )" );
 
     dbConn.execute_noresult( boost::str( boost::format(
-                                                       "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
-                                                       "latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
-                                         % minLat % maxLat % minLon % maxLon ) );
+        "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
+        "latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
+        % minLat % maxLat % minLon % maxLon ) );
 
     dbConn.execute_noresult(
-                            "INSERT INTO temp_way_ids SELECT DISTINCT way_nodes.id FROM way_nodes INNER JOIN "
-                            "temp_node_ids ON way_nodes.node_id=temp_node_ids.id" );
+        "INSERT INTO temp_way_ids SELECT DISTINCT way_nodes.id FROM way_nodes INNER JOIN "
+         "temp_node_ids ON way_nodes.node_id=temp_node_ids.id" );
 
-    // TODO: Make this not insert duplicate
-    //dbConn.execute_noresult(
-    //  "INSERT INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
-    //  "INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id" );
+    dbConn.execute_noresult(
+      "INSERT IGNORE INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
+      "INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id" );
 
     dbConn.execute( "SELECT COUNT(*) FROM temp_way_ids" );
     std::cout << dbConn.getField<int>( 0 ) << std::endl;
