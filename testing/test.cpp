@@ -212,8 +212,9 @@ struct WayTagLt
 
 class XMLWriter
 {
+
 public:
-    XMLWriter( std::ostream &outStream ) : m_outStream( outStream )
+    XMLWriter( std::ostream &outStream ) : indentLevel( 0 ), m_outStream( outStream )
     {
     }
 
@@ -228,19 +229,30 @@ public:
     void endNode( const std::string &nodeName );
 
 private:
+    void writeIndent();
 
+    int indentLevel;
     std::ostream &m_outStream;
 };
 
+void XMLWriter::writeIndent()
+{
+    m_outStream << std::string( indentLevel * 2, ' ' );
+}
+
 void XMLWriter::startNode( const std::string &nodeName )
 {
-    m_outStream << "<" << nodeName << ">";
+    writeIndent();
+    m_outStream << "<" << nodeName << ">" << std::endl;
+    indentLevel++;
 }
 
 template<typename T>
 void XMLWriter::startNode( const std::string &nodeName, const std::string &attrName, const T &attrValue )
 {
-    m_outStream << "<" << nodeName << " " << attrName << "=\"" << attrValue << "\">";
+    writeIndent();
+    m_outStream << "<" << nodeName << " " << attrName << "=\"" << attrValue << "\">" << std::endl;
+    indentLevel++;
 }
 
 template<typename T>
@@ -276,18 +288,26 @@ void XMLWriter::startNode( const std::string &nodeName, const std::string attrNa
   
     renderTags( attrValueTuple, attrNames, tags, 0 );
 
-    m_outStream << "<" << nodeName << " " << boost::algorithm::join( tags, " " ) << ">";
+    writeIndent();
+    m_outStream << "<" << nodeName << " " << boost::algorithm::join( tags, " " ) << ">" << std::endl;
+
+    indentLevel++;
 }
 
 void XMLWriter::endNode( const std::string &nodeName )
 {
-    m_outStream << "</" << nodeName << ">";
+    indentLevel--;
+    writeIndent();
+    m_outStream << "</" << nodeName << ">" << std::endl;
 }
 
 void map( double minLat, double maxLat, double minLon, double maxLon )
 {
     std::ofstream opFile( "test_result.txt" );
     XMLWriter xmlWriter( opFile );
+
+    const std::string osmNodeTags[] = { "version", "generator" };
+    xmlWriter.startNode( "osm", osmNodeTags, boost::make_tuple( "0.5", "modosmapi" ) );
 
     DbConnection dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
 
@@ -434,7 +454,7 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
                std::string v = theTag.get<2>();
 
                xmlWriter.startNode( "tag", tagTagNames, boost::make_tuple( k, v ) );
-               xmlWriter.startNode( "tag" );
+               xmlWriter.endNode( "tag" );
            }
         }
 
@@ -512,7 +532,7 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     }
     while ( dbConn.next() );
 
-    // Also output:  relations
+    xmlWriter.endNode( "osm" );
 
     dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
     dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
