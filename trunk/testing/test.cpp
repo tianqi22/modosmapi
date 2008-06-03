@@ -1,3 +1,5 @@
+#include "test.h"
+
 #include <iostream>
 #include <fstream>
 #include <exception>
@@ -17,7 +19,6 @@
 #include <boost/tuple/tuple.hpp>
 
 #include <mysql/mysql.h>
-
 
 // <host>/api/0.5select * from relation_tags inner join relations on relations.id=relation_tags.id inner join relation_members on relations.id=relation_members.id where member_id=4221467 and member_type='way'
 //
@@ -43,7 +44,8 @@
 // GET  /api/0.5/user/preferences
 
 
-
+namespace osm
+{
 
 
 class SqlException : public std::exception
@@ -301,9 +303,10 @@ void XMLWriter::endNode( const std::string &nodeName )
     m_outStream << "</" << nodeName << ">" << std::endl;
 }
 
-void map( double minLat, double maxLat, double minLon, double maxLon )
+void map(std::ostream &opFile, // destination for output
+         Context &context,      // database connection settings, etc...
+         double minLat, double maxLat, double minLon, double maxLon ) // function specific parameters
 {
-    std::ofstream opFile( "test_result.txt" );
     XMLWriter xmlWriter( opFile );
 
     const std::string osmNodeTags[] = { "version", "generator" };
@@ -544,6 +547,8 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     //            (and way_tags and relations)
 }
 
+} // end namespace osm
+
 int main( int argc, char **argv )
 {
     try
@@ -553,9 +558,11 @@ int main( int argc, char **argv )
         double minLon = -10000000;
         double maxLon = -9000000;
 
-        map( minLat, maxLat, minLon, maxLon );
+        std::ofstream opFile( "test_result.txt" );
+        osm::Context c;
+        osm::map(opFile, c, minLat, maxLat, minLon, maxLon );
     }
-    catch ( const SqlException &e )
+    catch ( const osm::SqlException &e )
     {
         std::cout << "SQL exception thrown: " << e.getMessage() << std::endl;
         return -1;
@@ -567,3 +574,4 @@ int main( int argc, char **argv )
 
     return 0;
 }
+
