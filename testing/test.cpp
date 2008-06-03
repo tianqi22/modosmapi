@@ -399,10 +399,24 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     }
     while( dbConn.next() );
 
+    typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, std::string> relationMember_t;
+    typedef std::map<boost::uint64_t, std::vector<relationMember_t> > relationMembers_t;
+    relationMembers_t relationMembers;
+    dbConn.execute( "SELECT relation_members.id, member_type, member_id, member_role FROM relation_members INNER JOIN "
+                    "temp_relation_ids ON relation_members.id=temp_relation_ids.id" );
+    do
+    {
+        relationMember_t relationMember;
+        dbConn.readRow( relationMember );
+        relationMembers[relationMember.get<0>()].push_back( relationMember );
+    }
+    while ( dbConn.next() );
+
     typedef boost::tuple<boost::uint64_t, bool, std::string, boost::uint64_t> relation_t;
     const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
     dbConn.execute( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
                     "temp_relation_ids ON relations.id=temp_relation_ids.id" );
+
     do
     {
         relation_t relation;
@@ -410,19 +424,31 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
 
         xmlWriter.startNode( "relation", relationTagNames, relation );
         
-        relationTags_t::iterator findIt = relationTags.find( relation.get<0>() );
-        if ( findIt != relationTags.end() )
+        relationTags_t::iterator rFindIt = relationTags.find( relation.get<0>() );
+        if ( rFindIt != relationTags.end() )
         {
             const std::string tagTagNames[] = { "k", "v" };
-            BOOST_FOREACH( const relationTag_t &theTag, findIt->second )
+            BOOST_FOREACH( const relationTag_t &theTag, rFindIt->second )
            {
                std::string k = theTag.get<1>();
                std::string v = theTag.get<2>();
 
                xmlWriter.startNode( "tag", tagTagNames, boost::make_tuple( k, v ) );
+               xmlWriter.startNode( "tag" );
            }
         }
-               
+
+        relationMembers_t::iterator mFindIt = relationMembers.find( relation.get<0>() );
+        if ( mFindIt != relationMembers.end() )
+        {
+            const std::string memberTagNames[] = { "type", "ref", "role" };
+            BOOST_FOREACH( const relationMember_t &theMember, mFindIt->second )
+            {
+                xmlWriter.startNode( "member", memberTagNames, theMember.tail );
+                xmlWriter.endNode( "member" );
+            }
+        }
+
         xmlWriter.endNode( "relation" );
     }
     while ( dbConn.next() );
