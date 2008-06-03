@@ -402,7 +402,7 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     typedef boost::tuple<boost::uint64_t, bool, std::string, boost::uint64_t> relation_t;
     const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
     dbConn.execute( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
-                    "temp_relations_id ON relations.id=temp_relations_id.id" );
+                    "temp_relation_ids ON relations.id=temp_relation_ids.id" );
     do
     {
         relation_t relation;
@@ -413,8 +413,13 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
         relationTags_t::iterator findIt = relationTags.find( relation.get<0>() );
         if ( findIt != relationTags.end() )
         {
+            const std::string tagTagNames[] = { "k", "v" };
             BOOST_FOREACH( const relationTag_t &theTag, findIt->second )
            {
+               std::string k = theTag.get<1>();
+               std::string v = theTag.get<2>();
+
+               xmlWriter.startNode( "tag", tagTagNames, boost::make_tuple( k, v ) );
            }
         }
                
@@ -485,6 +490,8 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
 
     dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
     dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
+    dbConn.execute_noresult( "DROP TABLE temp_relation_ids" );
+    
 
     // Similarly: SELECT ways.* FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id
     //            SELECT way_nodes.* FROM way_nodes INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id
