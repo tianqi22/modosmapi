@@ -2,11 +2,18 @@ APACHE_CPPFLAGS := -I/usr/include \
 		   -I/usr/include/apache2 \
                    -I/usr/include/apr-1.0
 
-.PHONEY: all
+.PHONEY: all install
 
+all : mod_osm.so test
 
-#apache.so : apache.c
-#	gcc $(APACHE_CPPFLAGS) -shared apache.c  -o mod_helloworld.so
+mod_osm.so : mod_osm.cpp test.cpp test.h
+	g++ $(APACHE_CPPFLAGS) $^ -shared -lboost_iostreams -lmysqlclient $(OUTPUT_OPTION)
 
-mod_osm.so : mod_osm.cpp
-	g++ $(APACHE_CPPFLAGS) -shared mod_osm.cpp -lboost_iostreams -lmysqlclient -o mod_osm.so
+test : test.cpp test.h
+	g++ $(APACHE_CPPFLAGS) $^ -lboost_iostreams -lmysqlclient $(OUTPUT_OPTION)
+
+install : mod_osm.so
+	cp mod_osm.so /usr/lib/apache2/modules
+	apache2ctl stop
+	apache2ctl start
+
