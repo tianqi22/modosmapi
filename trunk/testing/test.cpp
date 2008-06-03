@@ -19,7 +19,7 @@
 #include <mysql/mysql.h>
 
 
-// <host>/api/0.5
+// <host>/api/0.5select * from relation_tags inner join relations on relations.id=relation_tags.id inner join relation_members on relations.id=relation_members.id where member_id=4221467 and member_type='way'
 //
 // Creation:  PUT <objtype>/create + xml - returns id
 // Retrieval: GET <objtype>/id           - returns xml
@@ -293,6 +293,7 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
 
     dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_node_ids( id BIGINT, PRIMARY KEY(id) )" );
     dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_way_ids( id BIGINT, PRIMARY KEY(id) )" );
+    dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT,PRIMARY KEY(id) )" );
 
     dbConn.execute_noresult( boost::str( boost::format(
         "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
@@ -306,6 +307,14 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     dbConn.execute_noresult(
       "INSERT IGNORE INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
       "INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id" );
+
+    dbConn.execute_noresult( "INSERT INTO temp_relation_ids SELECT DISTINCT relation_members.id FROM "
+                             "relation_members INNER JOIN temp_node_ids ON relation_members.member_id=temp_node_ids.id "
+                             "WHERE member_type='node'" );
+
+    dbConn.execute_noresult( "INSERT IGNORE INTO temp_relation_ids SELECT DISTINCT relation_members.id "
+                             "FROM relation_members INNER JOIN temp_way_ids ON relation_members.member_id=temp_way_ids.id "
+                             "WHERE member_type='way'" );
 
     dbConn.execute( "SELECT COUNT(*) FROM temp_way_ids" );
     std::cout << dbConn.getField<int>( 0 ) << std::endl;
@@ -376,6 +385,45 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     }
     while ( dbConn.next() );
 
+    // TODO: Use a nice sorted vector as for the way tags
+    typedef boost::tuple<boost::uint64_t, std::string, std::string, std::string> relationTag_t;
+    typedef std::map<boost::uint64_t, std::vector<relationTag_t> > relationTags_t;
+    relationTags_t relationTags;
+    dbConn.execute( "SELECT relation_tags.id, k, v, version FROM relation_tags INNER JOIN temp_relation_ids "
+                    "ON relation_tags.id=temp_relation_ids.id" );
+    do
+    {
+        relationTag_t relationTag;
+        dbConn.readRow( relationTag );
+        relationTags[relationTag.get<0>()].push_back( relationTag );
+    }
+    while( dbConn.next() );
+
+    typedef boost::tuple<boost::uint64_t, bool, std::string, boost::uint64_t> relation_t;
+    const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
+    dbConn.execute( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
+                    "temp_relations_id ON relations.id=temp_relations_id.id" );
+    do
+    {
+        relation_t relation;
+        dbConn.readRow( relation );
+
+        xmlWriter.startNode( "relation", relationTagNames, relation );
+        
+        relationTags_t::iterator findIt = relationTags.find( relation.get<0>() );
+        if ( findIt != relationTags.end() )
+        {
+            BOOST_FOREACH( const relationTag_t &theTag, findIt->second )
+           {
+           }
+        }
+               
+        xmlWriter.endNode( "relation" );
+    }
+    while ( dbConn.next() );
+        
+        
+
     std::vector<wayTag_t> wayTags;
     dbConn.execute( "SELECT way_tags.id, k, v, version FROM way_tags INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id" );
     do
@@ -396,8 +444,8 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     dbConn.execute( "SELECT ways.id, visible, timestamp, user_id FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id" );
 
     do
-    {
-        boost::tuple<
+    { 
+       boost::tuple<
             boost::uint64_t,
             bool,
             std::string,
@@ -433,7 +481,7 @@ void map( double minLat, double maxLat, double minLon, double maxLon )
     }
     while ( dbConn.next() );
 
-    // Also output: ways, way_nodes, relations
+    // Also output:  relations
 
     dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
     dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
