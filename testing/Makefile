@@ -6,10 +6,10 @@ APACHE_CPPFLAGS := -I/usr/include \
 
 all : mod_osm.so test
 
-mod_osm.so : mod_osm.cpp test.cpp test.h
+mod_osm.so : mod_osm.cpp test.cpp test.h ioxml.h ioxml.cpp
 	g++ $(APACHE_CPPFLAGS) $^ -shared -lboost_iostreams -lmysqlclient $(OUTPUT_OPTION)
 
-test : test.cpp test.h
+test : test.cpp test.h ioxml.h ioxml.cpp
 	g++ $(APACHE_CPPFLAGS) $^ -lboost_iostreams -lmysqlclient $(OUTPUT_OPTION)
 
 install : mod_osm.so
