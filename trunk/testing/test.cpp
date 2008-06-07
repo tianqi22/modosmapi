@@ -1,4 +1,5 @@
 #include "test.h"
+#include "ioxml.h"
 
 #include <iostream>
 #include <fstream>
@@ -303,14 +304,16 @@ void XMLWriter::endNode( const std::string &nodeName )
     m_outStream << "</" << nodeName << ">" << std::endl;
 }
 
-void map(std::ostream &opFile, // destination for output
+void map(std::ostream &out, // destination for output
          Context &context,      // database connection settings, etc...
          double minLat, double maxLat, double minLon, double maxLon ) // function specific parameters
 {
-    XMLWriter xmlWriter( opFile );
+    out << xml::setformat (4, ' ');
 
     const std::string osmNodeTags[] = { "version", "generator" };
-    xmlWriter.startNode( "osm", osmNodeTags, boost::make_tuple( "0.5", "modosmapi" ) );
+    out << xml::indent
+        << "<osm " << xml::attrs (osmNodeTags, boost::make_tuple( "0.5", "modosmapi")) << ">\n"
+        << xml::inc;
 
     DbConnection dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
 
@@ -365,7 +368,9 @@ void map(std::ostream &opFile, // destination for output
 
         dbConn.readRow( nodeData );
 
-        xmlWriter.startNode( "node", nodeAttrNames, nodeData );
+        out << xml::indent
+	    << "<node " << xml::attrs (nodeAttrNames, nodeData) << ">\n"
+            << xml::inc;
 
         std::string tagString = dbConn.getField<std::string>( 5 );
 
@@ -386,12 +391,12 @@ void map(std::ostream &opFile, // destination for output
                 else
                 {
                     const std::string tagAttrNames[] = { "k", "v" };
-                    xmlWriter.startNode( "tag", tagAttrNames, boost::make_tuple( keyValue[0], keyValue[1] ) );
-                    xmlWriter.endNode( "tag" );
+		    out << xml::indent
+                        << "<tag " << xml::attrs (tagAttrNames, boost::make_tuple (keyValue[0], keyValue[1])) << "/>\n";
                 }
             }
         }
-        xmlWriter.endNode( "node" );
+        out << xml::dec << xml::indent << "</node>\n";
     }
     while ( dbConn.next() );
 
@@ -445,20 +450,19 @@ void map(std::ostream &opFile, // destination for output
         relation_t relation;
         dbConn.readRow( relation );
 
-        xmlWriter.startNode( "relation", relationTagNames, relation );
+        out << xml::indent << "<relation " << xml::attrs (relationTagNames, relation) << ">\n" << xml::inc;
         
         relationTags_t::iterator rFindIt = relationTags.find( relation.get<0>() );
         if ( rFindIt != relationTags.end() )
         {
             const std::string tagTagNames[] = { "k", "v" };
             BOOST_FOREACH( const relationTag_t &theTag, rFindIt->second )
-           {
-               std::string k = theTag.get<1>();
-               std::string v = theTag.get<2>();
+            {
+                std::string k = theTag.get<1>();
+                std::string v = theTag.get<2>();
 
-               xmlWriter.startNode( "tag", tagTagNames, boost::make_tuple( k, v ) );
-               xmlWriter.endNode( "tag" );
-           }
+                out << xml::indent << "<tag " << xml::attrs (tagTagNames, boost::make_tuple (k, v)) << "/>\n";
+            }
         }
 
         relationMembers_t::iterator mFindIt = relationMembers.find( relation.get<0>() );
@@ -467,12 +471,11 @@ void map(std::ostream &opFile, // destination for output
             const std::string memberTagNames[] = { "type", "ref", "role" };
             BOOST_FOREACH( const relationMember_t &theMember, mFindIt->second )
             {
-                xmlWriter.startNode( "member", memberTagNames, theMember.tail );
-                xmlWriter.endNode( "member" );
+                out << xml::indent << "<member " << xml::attrs (memberTagNames, theMember.tail) << "/>\n";
             }
         }
 
-        xmlWriter.endNode( "relation" );
+        out << xml::dec << xml::indent << "</relation>\n";
     }
     while ( dbConn.next() );
         
@@ -510,15 +513,14 @@ void map(std::ostream &opFile, // destination for output
 
         const std::string wayAttrNames[] = { "id", "visible", "timestamp", "user" };
 
-        xmlWriter.startNode( "way", wayAttrNames, wayData );
+        out << xml::indent << "<way " << xml::attrs (wayAttrNames, wayData) << ">\n" << xml::inc;
 
         wayNodes_t::iterator findIt = wayNodes.find( wayId );
         if ( findIt != wayNodes.end() )
         {
             BOOST_FOREACH( boost::uint64_t nodeId, findIt->second )
             {
-                xmlWriter.startNode( "nd", "ref", nodeId );
-                xmlWriter.endNode( "nd" );
+		out << xml::indent << "<nd ref=" << xml::quoteattr (nodeId) << "/>\n";
             } 
         } 
 
@@ -527,15 +529,14 @@ void map(std::ostream &opFile, // destination for output
         for ( ; tags.first != tags.second; tags.first++ )
         {
             const std::string tagAttrNames[] = { "k", "v", "version" };
-            xmlWriter.startNode( "tag", tagAttrNames, *tags.first );
-            xmlWriter.endNode( "tag" );
+	    out << xml::indent << "<tag " << xml::attrs (tagAttrNames, *tags.first) << "/>\n";
         }
-		
-        xmlWriter.endNode( "way" );
+	
+        out << xml::dec << xml::indent << "</way>";
     }
     while ( dbConn.next() );
 
-    xmlWriter.endNode( "osm" );
+    out << xml::dec << xml::indent << "</osm>";
 
     dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
     dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
