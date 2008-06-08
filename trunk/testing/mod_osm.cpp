@@ -56,6 +56,20 @@ static int osm_handler(request_rec* r)
     // Split the query
     //
     // GET  /api/0.5/map?bbox=<left>,<bottom>,<right>,<top>
+    // GET  /api/0.5/trackpoints?bbox=<left>,<bottom>,<right>,<top>&page=<pagenumber>
+    // GET  /api/0.5/<objtype>/<id>/history
+    // GET  /api/0.5/<objtype>s?<objtype>s=<id>[,<id>]
+    // GET  /api/0.5/node/<id>/ways
+    // GET  /api/0.5/<objtype>/<id>/relations
+    // GET  /api/0.5/<objtype>/<id>/full
+    // GET  /api/0.5/changes?hours=1&zoom=16
+    // GET  /api/0.5/ways/search?type=<type>&value=<value>
+    // GET  /api/0.5/relations/search?type=<type>&value=<value>
+    // GET  /api/0.5/search?type=<type>&value=<value>
+    // POST /api/0.5/gpx/create
+    // GET  /api/0.5/gpx/<id>/details
+    // GET  /api/0.5/gpx/<id>/data
+    // GET  /api/0.5/user/preferences
 
     std::string query (r->parsed_uri.query), bbox ("bbox=");
     

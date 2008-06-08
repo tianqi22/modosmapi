@@ -308,39 +308,32 @@ void map(std::ostream &out, // destination for output
          Context &context,      // database connection settings, etc...
          double minLat, double maxLat, double minLon, double maxLon ) // function specific parameters
 {
-    out << xml::setformat (4, ' ');
-
-    const std::string osmNodeTags[] = { "version", "generator" };
-    out << xml::indent
-        << "<osm " << xml::attrs (osmNodeTags, boost::make_tuple( "0.5", "modosmapi")) << ">\n"
-        << xml::inc;
-
     DbConnection dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
 
-    dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_node_ids( id BIGINT, PRIMARY KEY(id) )" );
-    dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_way_ids( id BIGINT, PRIMARY KEY(id) )" );
-    dbConn.execute_noresult( "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT,PRIMARY KEY(id) )" );
-
-    dbConn.execute_noresult( boost::str( boost::format(
-        "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
-        "latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
-        % minLat % maxLat % minLon % maxLon ) );
-
-    dbConn.execute_noresult(
+    std::string setup [] =
+    {
+        "CREATE TEMPORARY TABLE temp_node_ids    ( id BIGINT, PRIMARY KEY(id) )",
+        "CREATE TEMPORARY TABLE temp_way_ids     ( id BIGINT, PRIMARY KEY(id) )",
+        "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT, PRIMARY KEY(id) )",
+        boost::str( boost::format(
+        	"INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
+        	"latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
+        		% minLat % maxLat % minLon % maxLon ),
         "INSERT INTO temp_way_ids SELECT DISTINCT way_nodes.id FROM way_nodes INNER JOIN "
-         "temp_node_ids ON way_nodes.node_id=temp_node_ids.id" );
-
-    dbConn.execute_noresult(
-      "INSERT IGNORE INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
-      "INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id" );
-
-    dbConn.execute_noresult( "INSERT INTO temp_relation_ids SELECT DISTINCT relation_members.id FROM "
-                             "relation_members INNER JOIN temp_node_ids ON relation_members.member_id=temp_node_ids.id "
-                             "WHERE member_type='node'" );
-
-    dbConn.execute_noresult( "INSERT IGNORE INTO temp_relation_ids SELECT DISTINCT relation_members.id "
-                             "FROM relation_members INNER JOIN temp_way_ids ON relation_members.member_id=temp_way_ids.id "
-                             "WHERE member_type='way'" );
+        	 "temp_node_ids ON way_nodes.node_id=temp_node_ids.id",
+        "INSERT IGNORE INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
+        	"INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id",
+        "INSERT INTO temp_relation_ids SELECT DISTINCT relation_members.id FROM "
+        	"relation_members INNER JOIN temp_node_ids ON relation_members.member_id=temp_node_ids.id "
+                "WHERE member_type='node'",
+        "INSERT IGNORE INTO temp_relation_ids SELECT DISTINCT relation_members.id "
+                "FROM relation_members INNER JOIN temp_way_ids ON relation_members.member_id=temp_way_ids.id "
+                "WHERE member_type='way'",
+    };
+    BOOST_FOREACH (const std::string &command, setup)
+    {
+        dbConn.execute_noresult (command);
+    }
 
     dbConn.execute( "SELECT COUNT(*) FROM temp_way_ids" );
     std::cout << dbConn.getField<int>( 0 ) << std::endl;
@@ -356,6 +349,12 @@ void map(std::ostream &out, // destination for output
 
     dbConn.execute( "SELECT nodes.id, latitude, longitude, visible, timestamp, tags  FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
     std::cout << "Writing out nodes" << std::endl;
+
+    out << xml::setformat (4, ' ');
+    out << xml::indent << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    out << xml::indent << "<osm version=\"0.5\" generator=\"modosmapi\">\n";
+    out << xml::inc;
+
     do
     {
         const std::string nodeAttrNames[] = { "id", "lat", "lon", "visible", "timestamp" };
@@ -368,35 +367,44 @@ void map(std::ostream &out, // destination for output
 
         dbConn.readRow( nodeData );
 
-        out << xml::indent
-	    << "<node " << xml::attrs (nodeAttrNames, nodeData) << ">\n"
-            << xml::inc;
-
         std::string tagString = dbConn.getField<std::string>( 5 );
 
         std::vector<std::string> tags;
         boost::algorithm::split( tags, tagString, boost::algorithm::is_any_of( ";" ) );
-        BOOST_FOREACH( const std::string &tag, tags )
-        {
-            if ( !tag.empty() )
-            {
-                // TODO: Be less Lazy
-                std::vector<std::string> keyValue;
-                boost::algorithm::split( keyValue, tag, boost::algorithm::is_any_of( "=" ) );
 
-                if ( keyValue.size() != 2 )
+        out << xml::indent << "<node " << xml::attrs (nodeAttrNames, nodeData);
+
+        if (tags.empty () || (tags.size () == 1 && tags.front ().empty ()))
+        {
+            out << "/>\n";
+        }
+        else
+        {
+            out << ">\n";
+            out << xml::inc;
+
+            BOOST_FOREACH( const std::string &tag, tags )
+            {
+                if ( !tag.empty() )
                 {
-                    std::cout << "Node tag is not an '=' delimited key-value pair: " << tag << " (" << tagString << ")" << std::endl;
-                }
-                else
-                {
-                    const std::string tagAttrNames[] = { "k", "v" };
-		    out << xml::indent
-                        << "<tag " << xml::attrs (tagAttrNames, boost::make_tuple (keyValue[0], keyValue[1])) << "/>\n";
+                    // TODO: Be less Lazy
+                    std::vector<std::string> keyValue;
+                    boost::algorithm::split( keyValue, tag, boost::algorithm::is_any_of( "=" ) );
+    
+                    if ( keyValue.size() != 2 )
+                    {
+                        std::cout << "Node tag is not an '=' delimited key-value pair: " << tag << " (" << tagString << ")" << std::endl;
+                    }
+                    else
+                    {
+                        const std::string tagAttrNames[] = { "k", "v" };
+                        out << xml::indent << "<tag " << xml::attrs (tagAttrNames, boost::make_tuple (keyValue[0], keyValue[1])) << "/>\n";
+                    }
                 }
             }
+            out << xml::dec;
+            out << xml::indent << "</node>\n";
         }
-        out << xml::dec << xml::indent << "</node>\n";
     }
     while ( dbConn.next() );
 
@@ -450,7 +458,8 @@ void map(std::ostream &out, // destination for output
         relation_t relation;
         dbConn.readRow( relation );
 
-        out << xml::indent << "<relation " << xml::attrs (relationTagNames, relation) << ">\n" << xml::inc;
+        out << xml::indent << "<relation " << xml::attrs (relationTagNames, relation) << ">\n";
+        out << xml::inc;
         
         relationTags_t::iterator rFindIt = relationTags.find( relation.get<0>() );
         if ( rFindIt != relationTags.end() )
@@ -475,7 +484,8 @@ void map(std::ostream &out, // destination for output
             }
         }
 
-        out << xml::dec << xml::indent << "</relation>\n";
+        out << xml::dec;
+        out << xml::indent << "</relation>\n";
     }
     while ( dbConn.next() );
         
@@ -513,30 +523,33 @@ void map(std::ostream &out, // destination for output
 
         const std::string wayAttrNames[] = { "id", "visible", "timestamp", "user" };
 
-        out << xml::indent << "<way " << xml::attrs (wayAttrNames, wayData) << ">\n" << xml::inc;
+        out << xml::indent << "<way " << xml::attrs (wayAttrNames, wayData) << ">\n";
+        out << xml::inc;
 
         wayNodes_t::iterator findIt = wayNodes.find( wayId );
         if ( findIt != wayNodes.end() )
         {
             BOOST_FOREACH( boost::uint64_t nodeId, findIt->second )
             {
-		out << xml::indent << "<nd ref=" << xml::quoteattr (nodeId) << "/>\n";
+                out << xml::indent << "<nd ref=" << xml::quoteattr (nodeId) << "/>\n";
             } 
         } 
 
         wayTagRange_t tags = std::equal_range( wayTags.begin(), wayTags.end(), wayId, WayTagLt() );
 
-        for ( ; tags.first != tags.second; tags.first++ )
+        for ( ; tags.first != tags.second; ++tags.first )
         {
             const std::string tagAttrNames[] = { "k", "v", "version" };
-	    out << xml::indent << "<tag " << xml::attrs (tagAttrNames, *tags.first) << "/>\n";
+            out << xml::indent << "<tag " << xml::attrs (tagAttrNames, (*tags.first).tail) << "/>\n";
         }
-	
-        out << xml::dec << xml::indent << "</way>";
+        
+        out << xml::dec;
+        out << xml::indent << "</way>\n";
     }
     while ( dbConn.next() );
 
-    out << xml::dec << xml::indent << "</osm>";
+    out << xml::dec;
+    out << xml::indent << "</osm>\n";
 
     dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
     dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
@@ -550,7 +563,7 @@ void map(std::ostream &out, // destination for output
 
 } // end namespace osm
 
-int main( int argc, char **argv )
+int main( int argc, char *argv [] )
 {
     try
     {
@@ -571,6 +584,7 @@ int main( int argc, char **argv )
     catch ( const std::exception &e )
     {
         std::cout << "std::exception thrown: " << e.what() << std::endl;
+        throw;
     }
 
     return 0;
