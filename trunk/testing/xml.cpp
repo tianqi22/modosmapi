@@ -55,6 +55,131 @@ public:
 };
 
 
+XMLMemberRegistration::XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap ) : m_nodeFnBuildMap( nodeFnBuildMap )
+{
+}
+
+XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &memberName, nodeBuildFn_t callBackFn )
+{
+    m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
+
+    return *this;
+}
+
+XMLNodeAttributeMap::XMLNodeAttributeMap( const xercesc::Attributes &attributes )
+{
+    for ( int i = 0; i < attributes.getLength(); i++ )
+    {
+        std::string key   = transcodeString( attributes.getLocalName( i ) );
+        std::string value = transcodeString( attributes.getValue( i ) );
+
+        m_attributes.insert( std::make_pair( key, value ) );
+    }
+}
+
+XMLNodeData::XMLNodeData() : m_memberRegistration( m_nodeFnBuildMap )
+{
+}
+
+
+XMLNodeData::XMLNodeData( const xercesc::Attributes &attributes ) :
+    m_nodeAttributeMap( attributes ),
+    m_memberRegistration( m_nodeFnBuildMap )
+{
+}
+
+XMLNodeAttributeMap &XMLNodeData::readAttributes()
+{
+    return m_nodeAttributeMap;
+}
+
+XMLMemberRegistration &XMLNodeData::registerMembers()
+{
+    return m_memberRegistration;
+}
+
+nodeBuildFn_t XMLNodeData::getBuildFnFor( const std::string &nodeName )
+{
+    nodeBuildFnMap_t::iterator findIt = m_nodeFnBuildMap.find( nodeName );
+        
+    if ( findIt == m_nodeFnBuildMap.end() )
+    {
+        // Can't find the tag - make a nice error
+        throw std::exception();
+    }
+        
+    return findIt->second;
+}
+
+XMLReader::XMLReader( const XMLNodeData &startNode )
+{
+    m_buildStack.push_back( startNode );
+}
+    
+void XMLReader::startElement(
+    const XMLCh *const uri,
+    const XMLCh *const localname,
+    const XMLCh *const qame,
+    const xercesc::Attributes &attributes )
+{
+    std::string tagName = transcodeString( localname );
+    nodeBuildFn_t buildFn = m_buildStack.back().getBuildFnFor( tagName );
+
+    m_buildStack.push_back( XMLNodeData( attributes ) );
+    buildFn( m_buildStack.back() );
+}
+
+void XMLReader::endElement(
+    const XMLCh *const uri,
+    const XMLCh *const localname,
+    const XMLCh *const qname )
+{
+    m_buildStack.pop_back();
+}
+
+
+void XMLReader::characters(
+    const XMLCh *const chars,
+    const unsigned int length )
+{
+    // Throw an exception to complain about the characters we didn't expect
+    throw std::exception();
+}
+
+void XMLReader::warning( const xercesc::SAXParseException &e )
+{
+    int line = e.getLineNumber();
+    std::string message( transcodeString( e.getMessage() ) );
+    std::cerr << "XML parse warning (line " << line << ") " << message << std::endl;
+}
+
+void XMLReader::error( const xercesc::SAXParseException &e )
+{
+    int line = e.getLineNumber();
+    std::string message( transcodeString( e.getMessage() ) );
+
+    throw XmlParseException( boost::str( boost::format(
+        "XML parse error (line: %d): %s" )
+        % line % message ) );
+
+}
+
+void XMLReader::fatalError( const xercesc::SAXParseException &e )
+{
+     int line = e.getLineNumber();
+     std::string message( transcodeString( e.getMessage() ) );
+
+     throw XmlParseException( boost::str( boost::format(
+         "XML parse error (line: %d): %s" )
+         % line % message ) );
+}
+
+void buildOSMFragment( XMLNodeData &data )
+{
+    // TODO: Clearly this needs to go somewhere...
+    boost::shared_ptr<OSMFragment> newFragment( new OSMFragment( data ) );
+}
+
 int main( int argc, char **argv )
 {
     try
@@ -64,6 +189,8 @@ int main( int argc, char **argv )
         xercesc::SAX2XMLReaderImpl &parser = x.getParser();
 
         XMLNodeData startNdData;
+
+        startNdData.registerMembers()( "osm", &buildOSMFragment );
 
         XMLReader handler( startNdData );
 
