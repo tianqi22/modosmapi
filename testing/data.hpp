@@ -1,3 +1,6 @@
+#ifndef DATA_HPP
+#define DATA_HPP
+
 #include <string>
 #include <deque>
 #include <map>
@@ -7,101 +10,80 @@
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include <xercesc/sax2/Attributes.hpp>
-#include <xercesc/sax2/DefaultHandler.hpp>
-
-class XMLNodeData;
-
 typedef boost::uint64_t dbId_t;
 typedef std::string string_t;
 typedef std::pair<std::string, std::string> tag_t;
 typedef std::map<std::string, std::string> attributeMap_t;
 typedef boost::tuple<string_t, string_t, string_t> member_t;
-typedef boost::function<void(XMLNodeData &)> nodeBuildFn_t;
-typedef std::map<std::string, nodeBuildFn_t> nodeBuildFnMap_t;
 
-class XMLMemberRegistration
+#include "xml.hpp"
+
+class OSMNode
 {
 private:
-    nodeBuildFnMap_t m_nodeFnBuildMap;
+    id_t               m_id;
+    boost::int64_t     m_lat;
+    boost::int64_t     m_lon;
+    string_t           m_timestamp;
+    string_t           m_user;
+    id_t               m_userId;
+
+    std::vector<tag_t> m_tags;
 
 public:
-    XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap );
-    XMLMemberRegistration &operator()( const std::string &memberName, nodeBuildFn_t callBackFn );
+    OSMNode( XMLNodeData &data );
+    void readTag( XMLNodeData &data );
 };
 
-
-class XMLNodeAttributeMap
+class OSMWay
 {
 private:
-    attributeMap_t m_attributes;
+    id_t               m_id;
+    string_t           m_timestamp;
+    string_t           m_user;
+    id_t               m_userId;
+
+    std::vector<id_t> m_nodes;
+    std::vector<tag_t> m_tags;
 
 public:
-    XMLNodeAttributeMap() {}
-    XMLNodeAttributeMap( const xercesc::Attributes &attributes );
-
-    template<typename T>
-    XMLNodeAttributeMap &operator()( const std::string &tagName, T &var );
+    OSMWay( XMLNodeData &data );
+    void readTag( XMLNodeData &data );
+    void readNd( XMLNodeData &data );
 };
 
-
-class XMLNodeData
+class OSMRelation
 {
 private:
-    XMLNodeAttributeMap   m_nodeAttributeMap;
-    XMLMemberRegistration m_memberRegistration;
-    nodeBuildFnMap_t      m_nodeFnBuildMap;
+    id_t m_id;
+    string_t m_timestamp;
+    string_t m_user;
+    id_t m_userId;
+
+    std::vector<tag_t> m_tags;
+    std::vector<member_t> m_members;
 
 public:
-    XMLNodeData();
-    XMLNodeData( const xercesc::Attributes &attributes );
-    XMLNodeAttributeMap &readAttributes();
-    XMLMemberRegistration &registerMembers();
-    nodeBuildFn_t getBuildFnFor( const std::string &nodeName );
+    OSMRelation( XMLNodeData &data );
+    void readMember( XMLNodeData &data );
+    void readTag( XMLNodeData &data );
 };
 
-class XMLReader : public xercesc::DefaultHandler
+class OSMFragment
 {
 private:
-    std::deque<XMLNodeData> m_buildStack;
+    std::string m_version;
+    std::string m_generator;
+
+    std::vector<boost::shared_ptr<OSMNode> >     m_nodes;
+    std::vector<boost::shared_ptr<OSMWay> >      m_ways;
+    std::vector<boost::shared_ptr<OSMRelation> > m_relations;
 
 public:
-    XMLReader( const XMLNodeData &startNode );
-
-    void startElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qame,
-        const xercesc::Attributes &attributes );
-
-    void endElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qame );
-
-    void characters(
-        const XMLCh *const chars,
-        const unsigned int length );
-
-    void warning( const xercesc::SAXParseException &e );
-    void error( const xercesc::SAXParseException &e );
-    void fatalError( const xercesc::SAXParseException &e );
+    OSMFragment( XMLNodeData &data );
+    void readNode( XMLNodeData &data );
+    void readWay( XMLNodeData &data );
+    void readRelation( XMLNodeData &data );
 };
 
-
-// IPP bit
-
-template<typename T>
-XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName, T &var )
-{
-    attributeMap_t::iterator findIt = m_attributes.find( tagName );
-    if ( findIt == m_attributes.end() )
-    {
-        // Throw an attribute not found exception
-        throw std::exception();
-    }
-
-    var = boost::lexical_cast<T>( findIt->second );
-
-    return *this;
-}
+#endif // DATA_HPP
