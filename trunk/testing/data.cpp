@@ -2,7 +2,7 @@
 
 #include <boost/bind.hpp>
 #include <boost/format.hpp>
-
+#include <boost/shared_ptr.hpp>
 
 #include "data.hpp"
 #include "xml.hpp"
@@ -96,7 +96,7 @@ void XMLReader::characters(
 {
     // Throw an exception to complain about the characters we didn't expect
     throw std::exception();
- }
+}
 
 void XMLReader::warning( const xercesc::SAXParseException &e )
 {
@@ -126,6 +126,8 @@ void XMLReader::fatalError( const xercesc::SAXParseException &e )
          % line % message ) );
 }
 
+
+
 class OSMNode
 {
 private:
@@ -139,15 +141,7 @@ private:
     std::vector<tag_t> m_tags;
 
 public:
-    void readTag( XMLNodeData &data )
-    {
-        string_t k, v;
-        data.readAttributes()( "k", k )( "v", v );
-
-        m_tags.push_back( tag_t( k, v ) );
-    }
-
-    void readNode( XMLNodeData &data )
+    OSMNode( XMLNodeData &data )
     {
         data.readAttributes()
             ( "id", m_id )
@@ -158,6 +152,14 @@ public:
             ( "uid", m_userId );
 
         data.registerMembers()("tag", boost::bind( &OSMNode::readTag, this, _1 ) );
+    }
+
+    void readTag( XMLNodeData &data )
+    {
+        string_t k, v;
+        data.readAttributes()( "k", k )( "v", v );
+
+        m_tags.push_back( tag_t( k, v ) );
     }
 };
 
@@ -173,6 +175,19 @@ private:
     std::vector<tag_t> m_tags;
 
 public:
+    OSMWay( XMLNodeData &data )
+    {
+        data.readAttributes()
+            ( "id", m_id )
+            ( "timestamp", m_timestamp )
+            ( "user", m_user )
+            ( "uid", m_userId );
+
+        data.registerMembers()
+            ( "nd", boost::bind( &OSMWay::readNd, this, _1 ) )
+            ( "tag", boost::bind( &OSMWay::readTag, this, _1 ) );
+    }
+
     void readTag( XMLNodeData &data )
     {
         string_t k, v;
@@ -186,19 +201,7 @@ public:
         data.readAttributes()( "ref", ndId );
         m_nodes.push_back( ndId );
     }
-
-    void readWay( XMLNodeData &data )
-    {
-        data.readAttributes()
-            ( "id", m_id )
-            ( "timestamp", m_timestamp )
-            ( "user", m_user )
-            ( "uid", m_userId );
-
-        data.registerMembers()
-            ( "nd", boost::bind( &OSMWay::readNd, this, _1 ) )
-            ( "tag", boost::bind( &OSMWay::readTag, this, _1 ) );
-    }
+    
 };
 
 class OSMRelation
@@ -213,6 +216,20 @@ private:
     std::vector<member_t> m_members;
 
 public:
+    OSMRelation( XMLNodeData &data )
+    {
+        data.readAttributes()
+            ( "id", m_id )
+            ( "timestamp", m_timestamp )
+            ( "user", m_user )
+            ( "uid", m_userId );
+
+        data.registerMembers()
+            ( "member", boost::bind( &OSMRelation::readMember, this, _1 ) )
+            ( "tag", boost::bind( &OSMRelation::readTag, this, _1 ) );
+    }
+
+
     void readMember( XMLNodeData &data )
     {
         member_t theMember;
@@ -231,17 +248,47 @@ public:
             ( "v", theTag.second );
         m_tags.push_back( theTag );
     }
+};
+
+class OSMFragment
+{
+private:
+    std::string m_version;
+    std::string m_generator;
+
+    std::vector<boost::shared_ptr<OSMNode> >     m_nodes;
+    std::vector<boost::shared_ptr<OSMWay> >      m_ways;
+    std::vector<boost::shared_ptr<OSMRelation> > m_relations;
+
+public:
+    OSMFragment( XMLNodeData &data )
+    {
+        data.readAttributes()
+            ( "version", m_version )
+            ( "generator", m_generator );
+
+        data.registerMembers()
+            ( "node", boost::bind( &OSMFragment::readNode, this, _1 ) )
+            ( "way", boost::bind( &OSMFragment::readWay, this, _1 ) )
+            ( "relation", boost::bind( &OSMFragment::readRelation, this, _1 ) );
+    }
+
+    void readNode( XMLNodeData &data )
+    {
+        boost::shared_ptr<OSMNode> newNode( new OSMNode( data ) );
+        m_nodes.push_back( newNode );
+    }
+
+    void readWay( XMLNodeData &data )
+    {
+        boost::shared_ptr<OSMWay> newWay( new OSMWay( data ) );
+        m_ways.push_back( newWay );
+    }
 
     void readRelation( XMLNodeData &data )
     {
-        data.readAttributes()
-            ( "id", m_id )
-            ( "timestamp", m_timestamp )
-            ( "user", m_user )
-            ( "uid", m_userId );
-
-        data.registerMembers()
-            ( "member", boost::bind( &OSMRelation::readMember, this, _1 ) )
-            ( "tag", boost::bind( &OSMRelation::readTag, this, _1 ) );
+        boost::shared_ptr<OSMRelation> newRelation( new OSMRelation( data ) );
+        m_relations.push_back( newRelation );
     }
 };
+
