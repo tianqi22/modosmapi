@@ -8,11 +8,76 @@ typedef boost::tuple<string_t, string_t, string_t> member_t;
 typedef boost::function<void(XMLNodeData &)> nodeBuildFn_t;
 typedef std::map<std::string, nodeBuildFn_t> nodeBuildFnMap_t;
 
+class XMLMemberRegistration
+{
+private:
+    nodeBuildFnMap_t m_nodeFnBuildMap;
+
+public:
+    XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap );
+    XMLMemberRegistration &operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn );
+};
+
+
+class XMLNodeAttributeMap
+{
+private:
+    std::map<std::string, std::string> m_attributes;
+
+public:
+    XMLNodeAttributeMap( const xercesc::Attributes &attributes );
+
+    template<typename T>
+    XMLNodeAttributes &operator()( const std::string &tagName, T &var );
+};
+
+
+class XMLNodeData
+{
+private:
+    XMLNodeAttributeMap m_nodeAttributeMap;
+    nodeBuildFnMap_t    m_nodeFnBuildMap;
+
+public:
+    XMLNodeData( const xercesc::Attributes &attributes );
+    void readAttributes();
+    void registerMembers();
+    nodeBuildFn_t getBuildFnFor( const std::string &nodeName );
+};
+
+class XMLReader : public xercesc::DefaultHandler
+{
+private:
+    std::deque<XMLNodeData> m_buildStack;
+
+public:
+    XMLReader( const XMLNodeData &startNode );
+
+    void startElement(
+        const XMLCh *const uri,
+        const XMLCh *const localname,
+        const XMLCh *const qame,
+        const xercesc::Attributes &attributes );
+
+    void endElement(
+        const XMLCh *const uri,
+        const XMLCh *const localname,
+        const XMLCh *const qame );
+
+    void characters(
+        const XMLCh *const chars,
+        const unsigned int length );
+
+    void warning( const xercesc::SAXParseException &e );
+    void error( const xercesc::SAXParseException &e );
+    void fatalError( const xercesc::SAXParseException &e );
+};
+
 XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap ) : m_nodeFnBuildMap( nodeFnBuildMap )
 {
 }
 
-XMLMemberRegistration &operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn )
+XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn )
 {
     m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
 
