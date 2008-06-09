@@ -21,7 +21,7 @@
 
 #include <mysql/mysql.h>
 
-#include "test.h"
+#include "engine.h"
 
 struct Sink
 {
@@ -106,8 +106,8 @@ static int osm_handler(request_rec* r)
     //
     try
     {
-        osm::Context c;
-        osm::map (as, c, params [0], params [1], params [2], params [3]);
+        modosm::Context c;
+        modosm::map (as, c, params [0], params [1], params [2], params [3]);
     }
     catch (...)
     {
