@@ -1,4 +1,4 @@
-#include "test.h"
+#include "engine.h"
 #include "ioxml.h"
 
 #include <iostream>
@@ -45,7 +45,7 @@
 // GET  /api/0.5/user/preferences
 
 
-namespace osm
+namespace modosm
 {
 
 
@@ -561,7 +561,7 @@ void map(std::ostream &out, // destination for output
     //            (and way_tags and relations)
 }
 
-} // end namespace osm
+} // end namespace modosm
 
 int main( int argc, char *argv [] )
 {
@@ -573,10 +573,10 @@ int main( int argc, char *argv [] )
         double maxLon = -9000000;
 
         std::ofstream opFile( "test_result.txt" );
-        osm::Context c;
-        osm::map(opFile, c, minLat, maxLat, minLon, maxLon );
+        modosm::Context c;
+        modosm::map(opFile, c, minLat, maxLat, minLon, maxLon );
     }
-    catch ( const osm::SqlException &e )
+    catch ( const modosm::SqlException &e )
     {
         std::cout << "SQL exception thrown: " << e.getMessage() << std::endl;
         return -1;

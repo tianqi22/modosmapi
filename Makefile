@@ -2,7 +2,7 @@
 
 # Commands
 CP          := cp -f
-ECHO        := echo -e
+ECHO        := echo
 MKDIR       := mkdir -p
 PWD         := pwd
 DEL         := rm -f
