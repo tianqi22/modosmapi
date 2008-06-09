@@ -1,79 +1,39 @@
 
-class XMLNodeData;
-
-typedef boost::uint64_t id_t;
-typedef std::string string_t;
-typedef std::pair<std::string, std::string> tag_t;
-typedef boost::tuple<string_t, string_t, string_t> member_t;
-typedef boost::function<void(XMLNodeData &)> nodeBuildFn_t;
-typedef std::map<std::string, nodeBuildFn_t> nodeBuildFnMap_t;
-
-
-
-class XMLNodeAttributes
-{
-public:
-    template<typename T>
-    XMLNodeAttributes &operator()( const std::string &tagName, T &var )
-    {
-        // Bring this in from the map, then lexical cast it into var
-
-        return *this;
-    }
-};
-
-
 class XMLMemberRegistration
 {
 private:
     nodeBuildFnMap_t m_nodeFnBuildMap;
 
 public:
-    XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap ) : m_nodeFnBuildMap( nodeFnBuildMap )
-    {
-    }
+    XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap );
+    XMLMemberRegistration &operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn );
+};
 
-    XMLMemberRegistration &operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn )
-    {
-        m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
 
-        return *this;
-    }
+class XMLNodeAttributeMap
+{
+private:
+    std::map<std::string, std::string> m_attributes;
+
+public:
+    XMLNodeAttributeMap( const xercesc::Attributes &attributes );
+
+    template<typename T>
+    XMLNodeAttributes &operator()( const std::string &tagName, T &var );
 };
 
 
 class XMLNodeData
 {
-    nodeAttributeMap_t &m_nodeAttributeMap;
-    nodeBuildFnMap_t   m_nodeFnBuildMap;
+private:
+    XMLNodeAttributeMap m_nodeAttributeMap;
+    nodeBuildFnMap_t    m_nodeFnBuildMap;
 
 public:
-    XMLNodeData( nodeAttributeMap_t nodeAttributeMap ) : m_nodeAttributeMap( nodeAttributeMap )
-    {
-    }
-
-    void readAttributes()
-    {
-        return m_nodeAttributeMap;
-    }
-
-    void registerMembers()
-    {
-        return XMLMemberRegistration( m_nodeFnBuildMap );
-    }
-
-    nodeBuildFn_t getBuildFnFor( const std::string &nodeName )
-    {
-        nodeBuildFnMap_t::iterator findIt = m_nodeFnBuildMap.find( nodeName );
-        
-        if ( findIt == m_nodeFnBuildMap.end() )
-        {
-            // Can't find the tag - make a nice error
-            throw std::exception();
-        }
-        
-        return findIt->second;
-    }
+    XMLNodeData( const xercesc::Attributes &attributes );
+    void readAttributes();
+    void registerMembers();
+    nodeBuildFn_t getBuildFnFor( const std::string &nodeName );
 };
 
 class XMLReader : public xercesc::DefaultHandler
@@ -82,6 +42,25 @@ private:
     std::deque<XMLNodeData> m_buildStack;
 
 public:
+    XMLReader( const XMLNodeData &startNode );
+
+    void startElement(
+        const XMLCh *const uri,
+        const XMLCh *const localname,
+        const XMLCh *const qame,
+        const xercesc::Attributes &attributes );
+
+    void endElement(
+        const XMLCh *const uri,
+        const XMLCh *const localname,
+        const XMLCh *const qame );
+
+
+    XMLReader( const XMLNodeData &startNode )
+    {
+        m_buildStack.push_back( startNode );
+    }
+    
     void startElement(
         const XMLCh *const uri,
         const XMLCh *const localname,
@@ -92,14 +71,13 @@ public:
         nodeBuildFn_t buildFn = m_buildStack.back().getBuildFnFor( tagName );
 
         m_buildStack.push_back( XMLNodeData( attributes ) );
-
         buildFn( m_buildStack.back() );
     }
 
     void endElement(
         const XMLCh *const uri,
         const XMLCh *const localname,
-        const XMLCh *const qame )
+        const XMLCh *const qname )
     {
         m_buildStack.pop_back();
     }
