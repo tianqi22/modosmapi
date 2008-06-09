@@ -1,123 +1,117 @@
+#include "data.hpp"
 
-class XMLMemberRegistration
+XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap ) : m_nodeFnBuildMap( nodeFnBuildMap )
 {
-private:
-    nodeBuildFnMap_t m_nodeFnBuildMap;
+}
 
-public:
-    XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap );
-    XMLMemberRegistration &operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn );
-};
-
-
-class XMLNodeAttributeMap
+XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn )
 {
-private:
-    std::map<std::string, std::string> m_attributes;
+    m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
 
-public:
-    XMLNodeAttributeMap( const xercesc::Attributes &attributes );
+    return *this;
+}
 
-    template<typename T>
-    XMLNodeAttributes &operator()( const std::string &tagName, T &var );
-};
-
-
-class XMLNodeData
+XMLNodeAttributeMap( const xercesc::Attributes &attributes ) : m_attributes( attributes )
 {
-private:
-    XMLNodeAttributeMap m_nodeAttributeMap;
-    nodeBuildFnMap_t    m_nodeFnBuildMap;
-
-public:
-    XMLNodeData( const xercesc::Attributes &attributes );
-    void readAttributes();
-    void registerMembers();
-    nodeBuildFn_t getBuildFnFor( const std::string &nodeName );
-};
-
-class XMLReader : public xercesc::DefaultHandler
-{
-private:
-    std::deque<XMLNodeData> m_buildStack;
-
-public:
-    XMLReader( const XMLNodeData &startNode );
-
-    void startElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qame,
-        const xercesc::Attributes &attributes );
-
-    void endElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qame );
-
-
-    XMLReader( const XMLNodeData &startNode )
+    for ( int i = 0; i < attributes.getLength(); i++ )
     {
-        m_buildStack.push_back( startNode );
+        std::string key   = attributes.getLocalName( i );
+        std::string value = attributes.getValue( i );
+
+        m_attributes.insert( std::make_pair( key, value ) );
     }
-    
-    void startElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qame,
-        const xercesc::Attributes &attributes )
-    {
-        std::string tagName = transcodeString( localname );
-        nodeBuildFn_t buildFn = m_buildStack.back().getBuildFnFor( tagName );
+}
 
-        m_buildStack.push_back( XMLNodeData( attributes ) );
-        buildFn( m_buildStack.back() );
-    }
+XMLNodeData( const xercesc::Attributes &attributes ) : m_nodeAttributeMap( attributes )
+{
+}
 
-    void endElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qname )
-    {
-        m_buildStack.pop_back();
-    }
+void XMLNodeData::readAttributes()
+{
+    return m_nodeAttributeMap;
+}
 
-    void characters(
-        const XMLCh *const chars,
-        const unsigned int length )
+void XMLNodeData::registerMembers()
+{
+    return XMLMemberRegistration( m_nodeFnBuildMap );
+}
+
+nodeBuildFn_t XMLNodeData::getBuildFnFor( const std::string &nodeName )
+{
+    nodeBuildFnMap_t::iterator findIt = m_nodeFnBuildMap.find( nodeName );
+        
+    if ( findIt == m_nodeFnBuildMap.end() )
     {
-        // Throw an exception to complain about the characters we didn't expect
+        // Can't find the tag - make a nice error
         throw std::exception();
     }
-
-    void warning( const xercesc::SAXParseException &e )
-    {
-        int line = e.getLineNumber();
-        std::string message( transcodeString( e.getMessage() ) );
-        std::cerr << "XML parse warning (line " << line << ") " << message << std::endl;
+        
+    return findIt->second;
     }
+}
 
-    void error( const xercesc::SAXParseException &e )
-    {
-        int line = e.getLineNumber();
-        std::string message( transcodeString( e.getMessage() ) );
+XMLReader::XMLReader( const XMLNodeData &startNode )
+{
+    m_buildStack.push_back( startNode );
+}
+    
+void XMLReader::startElement(
+    const XMLCh *const uri,
+    const XMLCh *const localname,
+    const XMLCh *const qame,
+    const xercesc::Attributes &attributes )
+{
+    std::string tagName = transcodeString( localname );
+    nodeBuildFn_t buildFn = m_buildStack.back().getBuildFnFor( tagName );
 
-        throw XmlParseException( boost::str( boost::format(
-            "XML parse error (line: %d): %s" )
-            % line % message ) );
+    m_buildStack.push_back( XMLNodeData( attributes ) );
+    buildFn( m_buildStack.back() );
+}
 
-    }
+void XMLReader::endElement(
+    const XMLCh *const uri,
+    const XMLCh *const localname,
+    const XMLCh *const qname )
+{
+    m_buildStack.pop_back();
+}
 
-    void fatalError( const xercesc::SAXParseException &e )
-    {
-        int line = e.getLineNumber();
-        std::string message( transcodeString( e.getMessage() ) );
 
-        throw XmlParseException( boost::str( boost::format(
-            "XML parse error (line: %d): %s" )
-            % line % message ) );
-    }
-};
+void XMLReader::characters(
+    const XMLCh *const chars,
+    const unsigned int length )
+{
+    // Throw an exception to complain about the characters we didn't expect
+    throw std::exception();
+ }
+
+void XMLReader::warning( const xercesc::SAXParseException &e )
+{
+    int line = e.getLineNumber();
+    std::string message( transcodeString( e.getMessage() ) );
+    std::cerr << "XML parse warning (line " << line << ") " << message << std::endl;
+}
+
+void XMLReader::error( const xercesc::SAXParseException &e )
+{
+    int line = e.getLineNumber();
+    std::string message( transcodeString( e.getMessage() ) );
+
+    throw XmlParseException( boost::str( boost::format(
+        "XML parse error (line: %d): %s" )
+        % line % message ) );
+
+}
+
+void XMLReader::fatalError( const xercesc::SAXParseException &e )
+{
+     int line = e.getLineNumber();
+     std::string message( transcodeString( e.getMessage() ) );
+
+     throw XmlParseException( boost::str( boost::format(
+         "XML parse error (line: %d): %s" )
+         % line % message ) );
+}
 
 class OSMNode
 {
@@ -132,7 +126,7 @@ private:
     std::vector<tag_t> m_tags;
 
 public:
-    void readTag( data )
+    void readTag( XMLNodeData &data )
     {
         string_t k, v;
         data.readAttributes()( "k", k )( "v", v );
@@ -140,7 +134,7 @@ public:
         m_tags.push_back( tag_t( k, v ) );
     }
 
-    void readNode( data )
+    void readNode( XMLNodeData &data )
     {
         data.readAttributes()
             ( "id", m_id )
@@ -166,21 +160,21 @@ private:
     std::vector<tag_t> m_tags;
 
 public:
-    void readTag( data )
+    void readTag( XMLNodeData &data )
     {
         string_t k, v;
         data.readAttributes()( "k", k )( "v", v );
         m_tags.push_back( tag_t( k, v ) );
     }
 
-    void readNd( data )
+    void readNd( XMLNodeData &data )
     {
         id_t ndId;
         data.readAttributes()( "ref", nId );
         m_nodes.push_back( nId );
     }
 
-    void readWay( data )
+    void readWay( XMLNodeData &data )
     {
         data.readAttributes()
             ( "id", m_id )
@@ -206,7 +200,7 @@ private:
     std::vector<member_t> m_members;
 
 public:
-    void readMember( data )
+    void readMember( XMLNodeData &data )
     {
         member_t theMember;
         data.readAttributes()
@@ -216,7 +210,7 @@ public:
         m_members.push_back( theMember );
     }
 
-    void readTag( data )
+    void readTag( XMLNodeData &data )
     {
         tag_t theTag;
         data.readAttributes()
@@ -224,7 +218,7 @@ public:
             ( "v", theMember.get<1>() );
     }
 
-    void readRelation( data )
+    void readRelation( XMLNodeData &data )
     {
         data.readAttributes()
             ( "id", m_id )
