@@ -1,39 +1,53 @@
-#include "data.hpp"
+#include <iostream>
 
-XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap ) : m_nodeFnBuildMap( nodeFnBuildMap )
+#include <boost/bind.hpp>
+#include <boost/format.hpp>
+
+
+#include "data.hpp"
+#include "xml.hpp"
+
+XMLMemberRegistration::XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap ) : m_nodeFnBuildMap( nodeFnBuildMap )
 {
 }
 
-XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn )
+XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &memberName, nodeBuildFn_t callBackFn )
 {
     m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
 
     return *this;
 }
 
-XMLNodeAttributeMap( const xercesc::Attributes &attributes ) : m_attributes( attributes )
+XMLNodeAttributeMap::XMLNodeAttributeMap( const xercesc::Attributes &attributes )
 {
     for ( int i = 0; i < attributes.getLength(); i++ )
     {
-        std::string key   = attributes.getLocalName( i );
-        std::string value = attributes.getValue( i );
+        std::string key   = transcodeString( attributes.getLocalName( i ) );
+        std::string value = transcodeString( attributes.getValue( i ) );
 
         m_attributes.insert( std::make_pair( key, value ) );
     }
 }
 
-XMLNodeData( const xercesc::Attributes &attributes ) : m_nodeAttributeMap( attributes )
+XMLNodeData::XMLNodeData() : m_memberRegistration( m_nodeFnBuildMap )
 {
 }
 
-void XMLNodeData::readAttributes()
+
+XMLNodeData::XMLNodeData( const xercesc::Attributes &attributes ) :
+    m_nodeAttributeMap( attributes ),
+    m_memberRegistration( m_nodeFnBuildMap )
+{
+}
+
+XMLNodeAttributeMap &XMLNodeData::readAttributes()
 {
     return m_nodeAttributeMap;
 }
 
-void XMLNodeData::registerMembers()
+XMLMemberRegistration &XMLNodeData::registerMembers()
 {
-    return XMLMemberRegistration( m_nodeFnBuildMap );
+    return m_memberRegistration;
 }
 
 nodeBuildFn_t XMLNodeData::getBuildFnFor( const std::string &nodeName )
@@ -47,7 +61,6 @@ nodeBuildFn_t XMLNodeData::getBuildFnFor( const std::string &nodeName )
     }
         
     return findIt->second;
-    }
 }
 
 XMLReader::XMLReader( const XMLNodeData &startNode )
@@ -144,7 +157,7 @@ public:
             ( "user", m_user )
             ( "uid", m_userId );
 
-        data.registerMembers()("tag", boost::bind( readTag, this, _1 ) );
+        data.registerMembers()("tag", boost::bind( &OSMNode::readTag, this, _1 ) );
     }
 };
 
@@ -169,9 +182,9 @@ public:
 
     void readNd( XMLNodeData &data )
     {
-        id_t ndId;
-        data.readAttributes()( "ref", nId );
-        m_nodes.push_back( nId );
+        dbId_t ndId;
+        data.readAttributes()( "ref", ndId );
+        m_nodes.push_back( ndId );
     }
 
     void readWay( XMLNodeData &data )
@@ -183,8 +196,8 @@ public:
             ( "uid", m_userId );
 
         data.registerMembers()
-            ( "nd", boost::bind( readNd, this, _1 ) )
-            ( "tag", boost::bind( readTag, this, _1 ) );
+            ( "nd", boost::bind( &OSMWay::readNd, this, _1 ) )
+            ( "tag", boost::bind( &OSMWay::readTag, this, _1 ) );
     }
 };
 
@@ -214,8 +227,9 @@ public:
     {
         tag_t theTag;
         data.readAttributes()
-            ( "k", theMember.get<0>() )
-            ( "v", theMember.get<1>() );
+            ( "k", theTag.first )
+            ( "v", theTag.second );
+        m_tags.push_back( theTag );
     }
 
     void readRelation( XMLNodeData &data )
@@ -227,7 +241,7 @@ public:
             ( "uid", m_userId );
 
         data.registerMembers()
-            ( "member", boost::bind( readMember, this, _1 ) )
-            ( "tag", boost::bind( readTag, this, _1 ) );
+            ( "member", boost::bind( &OSMRelation::readMember, this, _1 ) )
+            ( "tag", boost::bind( &OSMRelation::readTag, this, _1 ) );
     }
 };
