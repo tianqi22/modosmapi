@@ -10,6 +10,8 @@
 
 #include <xercesc/parsers/SAX2XMLReaderImpl.hpp>
 
+#include "data.hpp"
+
 std::string escapeChars( std::string toEscape )
 {
     boost::algorithm::replace_all( toEscape, "&", "&amp;" );
@@ -27,20 +29,6 @@ std::string transcodeString( const XMLCh *const toTranscode )
 
     return theString;
 }
-
-class XmlParseException : public std::exception
-{
-    std::string m_message;
-
-public:
-    XmlParseException( const std::string &message ) : m_message( message )
-    {
-    }
-
-    virtual ~XmlParseException() throw ()
-    {
-    }
-};
 
 class XercesInitWrapper
 {
@@ -66,62 +54,6 @@ public:
     }
 };
 
-class DummySaxHandler : public xercesc::DefaultHandler
-{
-public:
-    void startElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qame,
-        const xercesc::Attributes &attributes )
-    {
-        std::cout << "Start: " << transcodeString( localname ) << std::endl;
-    }
-
-    void endElement(
-        const XMLCh *const uri,
-        const XMLCh *const localname,
-        const XMLCh *const qame )
-    {
-        std::cout << "End: " << transcodeString( localname ) << std::endl;
-    }
-
-    void characters(
-        const XMLCh *const chars,
-        const unsigned int length )
-    {
-    }
-
-    void warning( const xercesc::SAXParseException &e )
-    {
-        int line = e.getLineNumber();
-        std::string message( transcodeString( e.getMessage() ) );
-        std::cerr << "XML parse warning (line " << line << ") " << message << std::endl;
-    }
-
-    void error( const xercesc::SAXParseException &e )
-    {
-        int line = e.getLineNumber();
-        std::string message( transcodeString( e.getMessage() ) );
-
-        throw XmlParseException( boost::str( boost::format(
-            "XML parse error (line: %d): %s" )
-            % line % message ) );
-
-    }
-
-    void fatalError( const xercesc::SAXParseException &e )
-    {
-        int line = e.getLineNumber();
-        std::string message( transcodeString( e.getMessage() ) );
-
-        throw XmlParseException( boost::str( boost::format(
-            "XML parse error (line: %d): %s" )
-            % line % message ) );
-    }
-};
-
-
 
 int main( int argc, char **argv )
 {
@@ -131,7 +63,9 @@ int main( int argc, char **argv )
 
         xercesc::SAX2XMLReaderImpl &parser = x.getParser();
 
-        DummySaxHandler handler;
+        XMLNodeData startNdData;
+
+        XMLReader handler( startNdData );
 
         parser.setContentHandler( &handler );
         parser.setErrorHandler( &handler );
