@@ -1,8 +1,14 @@
 
+class XMLNodeData;
+
 typedef boost::uint64_t id_t;
 typedef std::string string_t;
 typedef std::pair<std::string, std::string> tag_t;
 typedef boost::tuple<string_t, string_t, string_t> member_t;
+typedef boost::function<void(XMLNodeData &)> nodeBuildFn_t;
+typedef std::map<std::string, nodeBuildFn_t> nodeBuildFnMap_t;
+
+
 
 class XMLNodeAttributes
 {
@@ -16,28 +22,122 @@ public:
     }
 };
 
+
 class XMLMemberRegistration
 {
+private:
+    nodeBuildFnMap_t m_nodeFnBuildMap;
+
 public:
+    XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap ) : m_nodeFnBuildMap( nodeFnBuildMap )
+    {
+    }
+
     XMLMemberRegistration &operator()( const std::string &memberName, boost::function<void(XMLNodeData &)> > callBackFn )
     {
-        // Pop something on the stack
+        m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
 
         return *this;
     }
 };
 
+
 class XMLNodeData
 {
+    nodeAttributeMap_t &m_nodeAttributeMap;
+    nodeBuildFnMap_t   m_nodeFnBuildMap;
+
 public:
+    XMLNodeData( nodeAttributeMap_t nodeAttributeMap ) : m_nodeAttributeMap( nodeAttributeMap )
+    {
+    }
+
     void readAttributes()
     {
-        return XMLNodeAttributes( /* Appropriate context here */ );
+        return m_nodeAttributeMap;
     }
 
     void registerMembers()
     {
-        return XMLMemberRegistration( /* Appropriate context here */ );
+        return XMLMemberRegistration( m_nodeFnBuildMap );
+    }
+
+    nodeBuildFn_t getBuildFnFor( const std::string &nodeName )
+    {
+        nodeBuildFnMap_t::iterator findIt = m_nodeFnBuildMap.find( nodeName );
+        
+        if ( findIt == m_nodeFnBuildMap.end() )
+        {
+            // Can't find the tag - make a nice error
+            throw std::exception();
+        }
+        
+        return findIt->second;
+    }
+};
+
+class XMLReader : public xercesc::DefaultHandler
+{
+private:
+    std::deque<XMLNodeData> m_buildStack;
+
+public:
+    void startElement(
+        const XMLCh *const uri,
+        const XMLCh *const localname,
+        const XMLCh *const qame,
+        const xercesc::Attributes &attributes )
+    {
+        std::string tagName = transcodeString( localname );
+        nodeBuildFn_t buildFn = m_buildStack.back().getBuildFnFor( tagName );
+
+        m_buildStack.push_back( XMLNodeData( attributes ) );
+
+        buildFn( m_buildStack.back() );
+    }
+
+    void endElement(
+        const XMLCh *const uri,
+        const XMLCh *const localname,
+        const XMLCh *const qame )
+    {
+        m_buildStack.pop_back();
+    }
+
+    void characters(
+        const XMLCh *const chars,
+        const unsigned int length )
+    {
+        // Throw an exception to complain about the characters we didn't expect
+        throw std::exception();
+    }
+
+    void warning( const xercesc::SAXParseException &e )
+    {
+        int line = e.getLineNumber();
+        std::string message( transcodeString( e.getMessage() ) );
+        std::cerr << "XML parse warning (line " << line << ") " << message << std::endl;
+    }
+
+    void error( const xercesc::SAXParseException &e )
+    {
+        int line = e.getLineNumber();
+        std::string message( transcodeString( e.getMessage() ) );
+
+        throw XmlParseException( boost::str( boost::format(
+            "XML parse error (line: %d): %s" )
+            % line % message ) );
+
+    }
+
+    void fatalError( const xercesc::SAXParseException &e )
+    {
+        int line = e.getLineNumber();
+        std::string message( transcodeString( e.getMessage() ) );
+
+        throw XmlParseException( boost::str( boost::format(
+            "XML parse error (line: %d): %s" )
+            % line % message ) );
     }
 };
 
@@ -159,8 +259,3 @@ public:
             ( "tag", boost::bind( readTag, this, _1 ) );
     }
 };
-
-
-// relation: id, timestamp, user, uid
-//   member: type, ref, role
-//   tag: k, v
