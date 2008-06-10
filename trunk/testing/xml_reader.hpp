@@ -1,9 +1,18 @@
 #ifndef XML_HPP
 #define XML_HPP
 
+#include <string>
+#include <map>
+#include <deque>
+
+#include <boost/function.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include <xercesc/sax2/Attributes.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
+#include <xercesc/parsers/SAX2XMLReaderImpl.hpp>
 
+typedef std::map<std::string, std::string> attributeMap_t;
 
 std::string escapeChars( std::string toEscape );
 std::string transcodeString( const XMLCh *const toTranscode );
@@ -91,6 +100,16 @@ public:
     void fatalError( const xercesc::SAXParseException &e );
 };
 
+class XercesInitWrapper
+{
+    xercesc::SAX2XMLReaderImpl *m_parser;
+
+public:
+    XercesInitWrapper();
+    ~XercesInitWrapper();
+
+    xercesc::SAX2XMLReaderImpl &getParser();
+};
 
 // IPP bit
 

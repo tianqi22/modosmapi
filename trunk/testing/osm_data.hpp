@@ -4,19 +4,20 @@
 #include <string>
 #include <deque>
 #include <map>
+#include <vector>
 
 #include <boost/cstdint.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/shared_ptr.hpp>
 
 typedef boost::uint64_t dbId_t;
 typedef std::string string_t;
 typedef std::pair<std::string, std::string> tag_t;
-typedef std::map<std::string, std::string> attributeMap_t;
 typedef boost::tuple<string_t, string_t, string_t> member_t;
 
-#include "xml.hpp"
+#include "xml_reader.hpp"
 
 class OSMNode
 {

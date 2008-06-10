@@ -4,8 +4,8 @@
 #include <boost/format.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "data.hpp"
-#include "xml.hpp"
+#include "osm_data.hpp"
+#include "xml_reader.hpp"
 
 
 OSMNode::OSMNode( XMLNodeData &data )
