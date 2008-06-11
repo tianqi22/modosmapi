@@ -81,7 +81,8 @@ private:
     std::vector<boost::shared_ptr<OSMRelation> > m_relations;
 
 public:
-    OSMFragment( XMLNodeData &data );
+    OSMFragment() {}
+    void build( XMLNodeData &data );
     void readNode( XMLNodeData &data );
     void readWay( XMLNodeData &data );
     void readRelation( XMLNodeData &data );

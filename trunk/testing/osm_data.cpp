@@ -10,6 +10,7 @@
 
 OSMNode::OSMNode( XMLNodeData &data )
 {
+    std::cout << "Node constructor" << std::endl;
     data.readAttributes()
         ( "id", m_id )
         ( "lat", m_lat )
@@ -17,6 +18,8 @@ OSMNode::OSMNode( XMLNodeData &data )
         ( "timestamp", m_timestamp )
         ( "user", m_user )
         ( "uid", m_userId );
+
+    std::cout << m_id << ", " << m_lat << ", " << m_lon << ", " << m_timestamp << ", " << m_userId << std::endl;
 
     data.registerMembers()("tag", boost::bind( &OSMNode::readTag, this, _1 ) );
 }
@@ -89,11 +92,13 @@ void OSMRelation::readTag( XMLNodeData &data )
 }
 
 
-OSMFragment::OSMFragment( XMLNodeData &data )
+void OSMFragment::build( XMLNodeData &data )
 {
     data.readAttributes()
         ( "version", m_version )
         ( "generator", m_generator );
+
+    std::cout << "OSM fragment: " << m_version << ", " << m_generator << std::endl;
 
     data.registerMembers()
         ( "node", boost::bind( &OSMFragment::readNode, this, _1 ) )
