@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <deque>
+#include <iostream>
 
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
@@ -24,6 +25,7 @@ class XmlParseException : public std::exception
 public:
     XmlParseException( const std::string &message ) : m_message( message ) { }
     virtual ~XmlParseException() throw () { }
+    virtual const char* what() const throw () { return m_message.c_str(); }
 };
 
 
@@ -35,7 +37,7 @@ typedef std::map<std::string, nodeBuildFn_t> nodeBuildFnMap_t;
 class XMLMemberRegistration
 {
 private:
-    nodeBuildFnMap_t m_nodeFnBuildMap;
+    nodeBuildFnMap_t &m_nodeFnBuildMap;
 
 public:
     XMLMemberRegistration( nodeBuildFnMap_t &nodeFnBuildMap );
@@ -70,6 +72,22 @@ public:
     XMLNodeAttributeMap &readAttributes();
     XMLMemberRegistration &registerMembers();
     nodeBuildFn_t getBuildFnFor( const std::string &nodeName );
+
+    void dumpRegMap()
+    {
+        nodeBuildFnMap_t::iterator it;
+        for ( it = m_nodeFnBuildMap.begin(); it != m_nodeFnBuildMap.end(); it++ )
+        {
+            std::cout << "Member: " << it->first << std::endl;
+        }
+    }
+
+    ~XMLNodeData()
+    {
+        std::cout << "Deleting node data with" << std::endl;
+        dumpRegMap();
+        std::cout << "Members" << std::endl;
+    }
 };
 
 class XMLReader : public xercesc::DefaultHandler

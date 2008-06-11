@@ -54,6 +54,8 @@ XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &mem
 {
     m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
 
+    std::cout << "Adding node fn: " << memberName << std::endl;
+
     return *this;
 }
 
@@ -96,7 +98,7 @@ nodeBuildFn_t XMLNodeData::getBuildFnFor( const std::string &nodeName )
     if ( findIt == m_nodeFnBuildMap.end() )
     {
         // Can't find the tag - make a nice error
-        throw std::exception();
+        throw XmlParseException( "Cannot find build fn for: " + nodeName );
     }
         
     return findIt->second;
@@ -114,10 +116,18 @@ void XMLReader::startElement(
     const xercesc::Attributes &attributes )
 {
     std::string tagName = transcodeString( localname );
+    std::cout << "Tag: " << tagName << std::endl;
     nodeBuildFn_t buildFn = m_buildStack.back().getBuildFnFor( tagName );
 
+    m_buildStack.back().dumpRegMap();
+
     m_buildStack.push_back( XMLNodeData( attributes ) );
+
+    m_buildStack.back().dumpRegMap();    
+
     buildFn( m_buildStack.back() );
+
+    m_buildStack.back().dumpRegMap();
 }
 
 void XMLReader::endElement(
@@ -133,8 +143,7 @@ void XMLReader::characters(
     const XMLCh *const chars,
     const unsigned int length )
 {
-    // Throw an exception to complain about the characters we didn't expect
-    throw std::exception();
+    //throw XMLParseException( "Unexpected characters in XML" );
 }
 
 void XMLReader::warning( const xercesc::SAXParseException &e )

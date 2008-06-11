@@ -3,13 +3,8 @@
 
 #include <iostream>
 #include <boost/shared_ptr.hpp>
+#include <boost/bind.hpp>
 
-
-void buildOSMFragment( XMLNodeData &data )
-{
-    // TODO: Clearly this needs to go somewhere...
-    boost::shared_ptr<OSMFragment> newFragment( new OSMFragment( data ) );
-}
 
 int main( int argc, char **argv )
 {
@@ -21,14 +16,16 @@ int main( int argc, char **argv )
 
         XMLNodeData startNdData;
 
-        startNdData.registerMembers()( "osm", &buildOSMFragment );
+        OSMFragment newFragment;
+
+        startNdData.registerMembers()( "osm", boost::bind( &OSMFragment::build, newFragment, _1 ) );
 
         XMLReader handler( startNdData );
 
         parser.setContentHandler( &handler );
         parser.setErrorHandler( &handler );
-        
-        parser.parse( "/home/alex/devel/osm/data/oxford-cotswolds-080514.osm" );
+
+        parser.parse( "./testinput.osm" );
 
     }
     catch ( const xercesc::XMLException &toCatch )
