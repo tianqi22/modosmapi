@@ -9,8 +9,8 @@ all : mod_osm.so test
 mod_osm.so : mod_osm.cpp test.cpp test.h ioxml.h ioxml.cpp
 	g++ $(APACHE_CPPFLAGS) $^ -shared -lboost_iostreams -lmysqlclient $(OUTPUT_OPTION)
 
-test : test.cpp test.h ioxml.h ioxml.cpp
-	g++ $(APACHE_CPPFLAGS) $^ -lboost_iostreams -lmysqlclient $(OUTPUT_OPTION)
+test : xml_read_test.cpp xml_reader.cpp osm_data.cpp
+	g++ $(APACHE_CPPFLAGS) $^ -g -lmysqlclient -lxerces-c $(OUTPUT_OPTION)
 
 install : mod_osm.so
 	cp mod_osm.so /usr/lib/apache2/modules

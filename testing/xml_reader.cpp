@@ -54,8 +54,6 @@ XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &mem
 {
     m_nodeFnBuildMap.insert( std::make_pair( memberName, callBackFn ) );
 
-    std::cout << "Adding node fn: " << memberName << std::endl;
-
     return *this;
 }
 
@@ -104,7 +102,7 @@ nodeBuildFn_t XMLNodeData::getBuildFnFor( const std::string &nodeName )
     return findIt->second;
 }
 
-XMLReader::XMLReader( const XMLNodeData &startNode )
+XMLReader::XMLReader( boost::shared_ptr<XMLNodeData> startNode )
 {
     m_buildStack.push_back( startNode );
 }
@@ -116,18 +114,10 @@ void XMLReader::startElement(
     const xercesc::Attributes &attributes )
 {
     std::string tagName = transcodeString( localname );
-    std::cout << "Tag: " << tagName << std::endl;
-    nodeBuildFn_t buildFn = m_buildStack.back().getBuildFnFor( tagName );
+    nodeBuildFn_t buildFn = m_buildStack.back()->getBuildFnFor( tagName );
 
-    m_buildStack.back().dumpRegMap();
-
-    m_buildStack.push_back( XMLNodeData( attributes ) );
-
-    m_buildStack.back().dumpRegMap();    
-
-    buildFn( m_buildStack.back() );
-
-    m_buildStack.back().dumpRegMap();
+    m_buildStack.push_back( boost::shared_ptr<XMLNodeData>( new XMLNodeData( attributes ) ) );
+    buildFn( *(m_buildStack.back().get()) );
 }
 
 void XMLReader::endElement(

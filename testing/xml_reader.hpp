@@ -8,6 +8,7 @@
 
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <xercesc/sax2/Attributes.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
@@ -55,7 +56,7 @@ public:
     XMLNodeAttributeMap( const xercesc::Attributes &attributes );
 
     template<typename T>
-    XMLNodeAttributeMap &operator()( const std::string &tagName, T &var );
+    XMLNodeAttributeMap &operator()( const std::string &tagName, T &var, bool optional=false, T defaultValue=T() );
 };
 
 
@@ -84,19 +85,16 @@ public:
 
     ~XMLNodeData()
     {
-        std::cout << "Deleting node data with" << std::endl;
-        dumpRegMap();
-        std::cout << "Members" << std::endl;
     }
 };
 
 class XMLReader : public xercesc::DefaultHandler
 {
 private:
-    std::deque<XMLNodeData> m_buildStack;
+    std::deque<boost::shared_ptr<XMLNodeData> > m_buildStack;
 
 public:
-    XMLReader( const XMLNodeData &startNode );
+    XMLReader( boost::shared_ptr<XMLNodeData> startNode );
 
     void startElement(
         const XMLCh *const uri,
@@ -132,16 +130,34 @@ public:
 // IPP bit
 
 template<typename T>
-XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName, T &var )
+XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName, T &var, bool optional, T defaultValue )
 {
     attributeMap_t::iterator findIt = m_attributes.find( tagName );
     if ( findIt == m_attributes.end() )
     {
         // Throw an attribute not found exception
-        throw std::exception();
+        if ( optional )
+        {
+            var = defaultValue;
+        }
+        else
+        {
+            throw XmlParseException( "Error: missing attribute: " + tagName );
+        }
     }
-
-    var = boost::lexical_cast<T>( findIt->second );
+    else
+    {
+        try
+        {
+            var = boost::lexical_cast<T>( findIt->second );
+        }
+        catch ( std::exception &e )
+        {
+            std::cerr << "Trying to cast tag: " << tagName << " with value " << findIt->second;
+            std::cerr << " to type " << typeid( T ).name() << std::endl;
+            throw ;
+        }
+    }
 
     return *this;
 }

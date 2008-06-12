@@ -4,29 +4,62 @@
 #include <iostream>
 #include <boost/shared_ptr.hpp>
 #include <boost/bind.hpp>
+#include <boost/foreach.hpp>
 
+
+void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
+{
+
+    xercesc::SAX2XMLReaderImpl &parser = x.getParser();
+
+    boost::shared_ptr<XMLNodeData> startNdData( new XMLNodeData() );
+
+    startNdData->registerMembers()( "osm", boost::bind( &OSMFragment::build, &frag, _1 ) );
+
+    XMLReader handler( startNdData );
+
+    parser.setContentHandler( &handler );
+    parser.setErrorHandler( &handler );
+
+    parser.parse( fileName.c_str() );
+}
+
+#define BOOST_CHECK_EQUAL( a, b ) if ( (a) != (b) ) { \
+        std::cerr << "Check equal failed: " << a << " != " << b << " (" << __FILE__ << ", " << __LINE__ << ")" << std::endl; \
+    } else {}
+
+
+void testXMLRead( XercesInitWrapper &x )
+{
+    OSMFragment newFragment;
+    readOSMXML( x, "./testinput.xml", newFragment );
+
+    BOOST_CHECK_EQUAL( newFragment.getVersion(), "0.5" );
+    BOOST_CHECK_EQUAL( newFragment.getGenerator(), "OpenStreetMap server" );
+    BOOST_CHECK_EQUAL( newFragment.getNodes().size(), 5 );
+    BOOST_CHECK_EQUAL( newFragment.getWays().size(), 1 );
+    BOOST_CHECK_EQUAL( newFragment.getRelations().size(), 1 );
+
+    const boost::shared_ptr<OSMWay> &theWay = newFragment.getWays().begin()->second;
+
+    BOOST_CHECK_EQUAL( theWay->getId(), 3236218 );
+    //BOOST_CHECK_EQUAL( theWay->getVisible(), true );
+    BOOST_CHECK_EQUAL( theWay->getTimeStamp(), "2008-03-02T22:38:37+00:00" );
+    BOOST_CHECK_EQUAL( theWay->getUser(), "Antoine Sirinelli" );
+
+    BOOST_CHECK_EQUAL( theWay->getTags().find("highway")->second, "tertiary" );
+    BOOST_CHECK_EQUAL( theWay->getTags().find("name")->second, "Meadow Prospect" );
+    BOOST_CHECK_EQUAL( theWay->getTags().find("created_by")->second, "Potlatch 0.7b" );
+
+}
 
 int main( int argc, char **argv )
 {
     try
     {
         XercesInitWrapper x;
-
-        xercesc::SAX2XMLReaderImpl &parser = x.getParser();
-
-        XMLNodeData startNdData;
-
-        OSMFragment newFragment;
-
-        startNdData.registerMembers()( "osm", boost::bind( &OSMFragment::build, newFragment, _1 ) );
-
-        XMLReader handler( startNdData );
-
-        parser.setContentHandler( &handler );
-        parser.setErrorHandler( &handler );
-
-        parser.parse( "./testinput.osm" );
-
+        
+        testXMLRead( x );       
     }
     catch ( const xercesc::XMLException &toCatch )
     {

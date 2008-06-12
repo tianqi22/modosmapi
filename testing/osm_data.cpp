@@ -10,16 +10,13 @@
 
 OSMNode::OSMNode( XMLNodeData &data )
 {
-    std::cout << "Node constructor" << std::endl;
     data.readAttributes()
         ( "id", m_id )
         ( "lat", m_lat )
         ( "lon", m_lon )
         ( "timestamp", m_timestamp )
-        ( "user", m_user )
-        ( "uid", m_userId );
-
-    std::cout << m_id << ", " << m_lat << ", " << m_lon << ", " << m_timestamp << ", " << m_userId << std::endl;
+        ( "user", m_user, true, std::string( "none" ) )
+        ( "uid", m_userId, true );
 
     data.registerMembers()("tag", boost::bind( &OSMNode::readTag, this, _1 ) );
 }
@@ -29,7 +26,7 @@ void OSMNode::readTag( XMLNodeData &data )
     string_t k, v;
     data.readAttributes()( "k", k )( "v", v );
 
-    m_tags.push_back( tag_t( k, v ) );
+    m_tags.insert( tag_t( k, v ) );
 }
 
 OSMWay::OSMWay( XMLNodeData &data )
@@ -37,8 +34,9 @@ OSMWay::OSMWay( XMLNodeData &data )
     data.readAttributes()
         ( "id", m_id )
         ( "timestamp", m_timestamp )
-        ( "user", m_user )
-        ( "uid", m_userId );
+        //( "visible", m_visible )
+        ( "user", m_user, true )
+        ( "uid", m_userId, true );
 
     data.registerMembers()
         ( "nd", boost::bind( &OSMWay::readNd, this, _1 ) )
@@ -49,7 +47,7 @@ void OSMWay::readTag( XMLNodeData &data )
 {
     string_t k, v;
     data.readAttributes()( "k", k )( "v", v );
-    m_tags.push_back( tag_t( k, v ) );
+    m_tags.insert( tag_t( k, v ) );
 }
 
 void OSMWay::readNd( XMLNodeData &data )
@@ -88,7 +86,7 @@ void OSMRelation::readTag( XMLNodeData &data )
     data.readAttributes()
         ( "k", theTag.first )
         ( "v", theTag.second );
-    m_tags.push_back( theTag );
+    m_tags.insert( theTag );
 }
 
 
@@ -109,18 +107,18 @@ void OSMFragment::build( XMLNodeData &data )
 void OSMFragment::readNode( XMLNodeData &data )
 {
     boost::shared_ptr<OSMNode> newNode( new OSMNode( data ) );
-    m_nodes.push_back( newNode );
+    m_nodes.insert( std::make_pair( newNode->getId(), newNode ) );
 }
 
 void OSMFragment::readWay( XMLNodeData &data )
 {
     boost::shared_ptr<OSMWay> newWay( new OSMWay( data ) );
-    m_ways.push_back( newWay );
+    m_ways.insert( std::make_pair( newWay->getId(), newWay ) );
 }
 
 void OSMFragment::readRelation( XMLNodeData &data )
 {
     boost::shared_ptr<OSMRelation> newRelation( new OSMRelation( data ) );
-    m_relations.push_back( newRelation );
+    m_relations.insert( std::make_pair( newRelation->getId(), newRelation ) );
 }
 
