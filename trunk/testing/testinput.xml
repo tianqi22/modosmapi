@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.5" generator="OpenStreetMap server">
+  <node id="336846" lat="51.782622" lon="-1.2949377" visible="true" timestamp="2006-05-28T16:22:56+01:00"/>
+  <node id="336847" lat="51.7829936" lon="-1.2944341" visible="true" timestamp="2005-12-21T19:10:59+00:00"/>
+  <node id="336848" lat="51.783206" lon="-1.2934899" visible="true" timestamp="2005-12-21T19:11:04+00:00"/>
+  <node id="14191822" lat="51.7839356" lon="-1.292755" user="Gagravarr" visible="true" timestamp="2006-08-27T17:19:51+01:00">
+    <tag k="place" v="village"/>
+    <tag k="name" v="Lower Wolvercote"/>
+    <tag k="created_by" v="JOSM"/>
+  </node>
+  <node id="20965964" lat="51.783634" lon="-1.2932381" user="FranBoon" visible="true" timestamp="2007-03-18T19:44:08+00:00">
+    <tag k="amenity" v="pub"/>
+    <tag k="name" v="The Red Lion"/>
+    <tag k="created_by" v="JOSM"/>
+  </node>
+  <way id="3236218" visible="true" timestamp="2008-03-02T22:38:37+00:00" user="Antoine Sirinelli">
+    <nd ref="336846"/>
+    <nd ref="336847"/>
+    <nd ref="336848"/>
+    <tag k="highway" v="tertiary"/>
+    <tag k="name" v="Meadow Prospect"/>
+    <tag k="created_by" v="Potlatch 0.7b"/>
+  </way>
+<relation id="40058" timestamp="2008-03-02T22:38:37+00:00" user="Alex Wilson" uid="28">
+<member type="way" ref="3236218" role="The road in this test"/>
+<member type="node" ref="14191822" role="The pub in this test"/>
+<tag k="TestInfo" v="My simple test"/>
+</relation>
+</osm>
