@@ -93,6 +93,11 @@ int main( int argc, char **argv )
         std::cerr << "Exception thrown in XML parse" << std::endl;
         throw;
     }
+    catch ( const modosmapi::SqlException &e )
+    {
+        std::cerr << std::string( "Exception thrown with message: " ) << e.getMessage() << std::endl;
+        throw;
+    }
     catch ( const std::exception &e )
     {
         std::cerr << "Exception thrown in XML parse: " << e.what() << std::endl;
