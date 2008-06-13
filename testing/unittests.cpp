@@ -9,6 +9,7 @@
 #include <boost/foreach.hpp>
 
 #include <boost/test/included/unit_test.hpp>
+#include <boost/test/floating_point_comparison.hpp>
 
 void testDbHandler()
 {
@@ -59,6 +60,31 @@ void testDbHandler()
         }
 
         db.executeNoResult( "DROP TABLE test_temp" );
+
+        db.executeNoResult( "CREATE TEMPORARY TABLE test_temp2( text1 VARCHAR(255), id BIGINT, value1 INT, value2 DOUBLE, text2 TEXT, time DATETIME  )" );
+
+        typedef boost::tuple<std::string, boost::uint64_t, int, double, std::string, boost::posix_time::ptime> testTuple_t;
+
+        boost::posix_time::ptime now = boost::posix_time::ptime(
+            boost::gregorian::date( 2008, 06, 10 ),
+            boost::posix_time::time_duration( 18, 16, 00 ) );
+
+        std::vector<testTuple_t> testVec2;
+        testVec2.push_back( boost::make_tuple( "Hello", 1231283721, -24, 3.14159254, "World", now ) );
+        db.executeBulkInsert( "INSERT INTO test_temp2 VALUES( ?, ?, ?, ?, ?, ? )", testVec2 );
+
+        db.execute( "SELECT COUNT(*) FROM test_temp2" );
+        BOOST_CHECK_EQUAL( db.getField<int>( 0 ), 1 );
+
+        db.execute( "SELECT * from test_temp2" );
+        BOOST_CHECK_EQUAL( db.getField<std::string>( 0 ), "Hello" );
+        BOOST_CHECK_EQUAL( db.getField<boost::uint64_t>( 1 ), 1231283721 );
+        BOOST_CHECK_EQUAL( db.getField<int>( 2 ), -24 );
+        BOOST_CHECK_CLOSE( db.getField<double>( 3 ), 3.141592654, 0.00001 );
+        BOOST_CHECK_EQUAL( db.getField<std::string>( 4 ), "World" );
+        //BOOST_CHECK_EQUAL( db.getField<boost::posix_time::ptime>( 5 ), now );
+
+        db.executeNoResult( "DROP TABLE test_temp2" );
     }
     catch( modosmapi::SqlException &e )
     {
