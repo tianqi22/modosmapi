@@ -19,6 +19,8 @@
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include <mysql/mysql.h>
 
 // <host>/api/0.5select * from relation_tags inner join relations on relations.id=relation_tags.id inner join relation_members on relations.id=relation_members.id where member_id=4221467 and member_type='way'
@@ -105,6 +107,41 @@ public:
         }
     }
 
+    // e.g. INSERT INTO blah VALUES ( ?, ?, ?, ? )
+
+    template<typename T>
+    void execute_bulk_insert( std::string query, const std::vector<T> &rows )
+    {
+        MYSQL_STMT *ps = mysql_stmt_init( &m_dbconn );
+        if ( !ps )
+        {
+            throw SqlException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
+        }
+
+        if ( mysql_stmt_prepare( ps, query.c_str(), query.size() ) )
+        {
+            throw SqlException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
+        }
+
+        MYSQL_BIND args[boost::tuples::length<T>::value];
+        BOOST_FOREACH( const T &row, rows )
+        {
+            memset( args, 0, sizeof( args ) );
+
+            bindArgsRec( args, row, 0 );
+
+            mysql_stmt_bind_param( ps, args );
+
+            if ( mysql_stmt_execute( ps ) )
+            {
+                throw SqlException( std::string( "Statement execute failed: " ) + mysql_error( &m_dbconn ) );
+            }
+        }
+
+        mysql_stmt_close( ps );
+
+    }
+
     void execute_noresult( std::string query )
     {
         cleanUp();
@@ -161,6 +198,80 @@ public:
         }
         return boost::lexical_cast<T>( m_row[index] );
     }
+
+    void bindArg( MYSQL_BIND *args, const std::string &value, int offset )
+    {
+        args[offset].buffer_type = MYSQL_TYPE_STRING;
+
+        // TODO: WILL NOT WORK - BUFFER NOT AVAILABLE FOR LONG ENOUGH
+        args[offset].buffer = const_cast<char *>( "BLAH" );
+        args[offset].buffer_length = 4;
+        args[offset].is_null = 0;
+
+        // TODO: WHAT TO DO ABOUT THIS RETURNED LENGTH?
+        unsigned long str_length;
+        args[offset].length = &str_length;
+    }
+
+    void bindArg( MYSQL_BIND *args, boost::uint64_t value, int offset )
+    {
+        args[offset].buffer_type = MYSQL_TYPE_LONGLONG;
+        args[offset].buffer = reinterpret_cast<char *>( &value );
+        args[offset].is_unsigned = 1;
+        args[offset].is_null = 0;
+        args[offset].length = 0;
+    }
+
+    void bindArg( MYSQL_BIND *args, boost::int64_t value, int offset )
+    {
+        args[offset].buffer_type = MYSQL_TYPE_LONGLONG;
+        args[offset].buffer = reinterpret_cast<char *>( &value );
+        args[offset].is_unsigned = 0;
+        args[offset].is_null = 0;
+        args[offset].length = 0;
+    }
+    
+    void bindArg( MYSQL_BIND *args, double value, int offset )
+    {
+        args[offset].buffer_type = MYSQL_TYPE_DOUBLE;
+        args[offset].buffer = reinterpret_cast<char *>( &value );
+        args[offset].is_null = 0;
+    }
+
+    void bindArg( MYSQL_BIND *args, bool value, int offset )
+    {
+    }
+
+    void bindArg( MYSQL_BIND *args, const boost::posix_time::ptime &datetime, int offset )
+    {
+        MYSQL_TIME ts;
+        ts.year   = datetime.date().year();
+        ts.month  = datetime.date().month();
+        ts.day    = datetime.date().day();
+        ts.hour   = datetime.time_of_day().hours();
+        ts.minute = datetime.time_of_day().minutes();
+        ts.second = datetime.time_of_day().seconds();
+
+        args[offset].buffer_type = MYSQL_TYPE_TIMESTAMP;
+        args[offset].buffer = reinterpret_cast<char *>( &ts );
+        args[offset].is_null = 0;
+        args[offset].length = 0;
+    }
+
+
+    template<typename T1, typename T2>
+    void bindArgsRec( MYSQL_BIND *args, boost::tuples::cons<T1, T2> &row, int offset )
+    { 
+        bindArg( args, row.head, offset );
+        bindArgsRec( args, row.tail, offset+1 );
+    }
+
+    template<typename T>
+    void bindArgsRec( MYSQL_BIND *args, boost::tuples::cons<T, boost::tuples::null_type> &row, int offset )
+    {
+        bindArg( args, row.head, offset );
+    }
+
 
     template<typename T1, typename T2>
     void readRow( boost::tuples::cons<T1, T2> &t, size_t index=0 )
