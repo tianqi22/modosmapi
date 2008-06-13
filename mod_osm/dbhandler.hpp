@@ -1,8 +1,10 @@
 #include <string>
+#include <vector>
 
 #include <boost/cstdint.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/shared_array.hpp>
 
 #include <mysql/mysql.h>
 
@@ -66,6 +68,8 @@ namespace modosmapi
         MYSQL_ROW m_row;
 
         static bool created;
+
+        std::vector<boost::shared_array<char> > m_bulkInsertBuf;
 
     };
 }

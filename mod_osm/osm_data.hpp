@@ -20,6 +20,9 @@ typedef boost::tuple<string_t, string_t, string_t> member_t;
 
 #include "xml_reader.hpp"
 
+
+class OSMFragment;
+
 class OSMNode
 {
 private:
@@ -33,7 +36,7 @@ private:
     tagMap_t           m_tags;
 
 public:
-    OSMNode( XMLNodeData &data );
+    OSMNode( OSMFragment &frag, XMLNodeData &data );
 
     id_t getId() const { return m_id; }
     void readTag( XMLNodeData &data );
@@ -53,7 +56,7 @@ private:
     tagMap_t           m_tags;
 
 public:
-    OSMWay( XMLNodeData &data );
+    OSMWay( OSMFragment &frag, XMLNodeData &data );
     void readTag( XMLNodeData &data );
     void readNd( XMLNodeData &data );
 
@@ -78,7 +81,7 @@ private:
     std::vector<member_t> m_members;
 
 public:
-    OSMRelation( XMLNodeData &data );
+    OSMRelation( OSMFragment &frag, XMLNodeData &data );
     void readMember( XMLNodeData &data );
     void readTag( XMLNodeData &data );
 
@@ -93,6 +96,7 @@ public:
     typedef std::map<id_t, boost::shared_ptr<OSMNode> >     nodeMap_t;
     typedef std::map<id_t, boost::shared_ptr<OSMWay> >      wayMap_t;
     typedef std::map<id_t, boost::shared_ptr<OSMRelation> > relationMap_t;
+    typedef std::map<id_t, std::string>                     userMap_t;
 
 private:
     std::string m_version;
@@ -101,6 +105,7 @@ private:
     nodeMap_t     m_nodes;
     wayMap_t      m_ways;
     relationMap_t m_relations;
+    userMap_t     m_userDetails;
 
 public:
     OSMFragment() {}
@@ -109,12 +114,15 @@ public:
     void readWay( XMLNodeData &data );
     void readRelation( XMLNodeData &data );
 
+    void addUser( id_t userId, const std::string &userName );
+
     const std::string &getVersion() const { return m_version; }
     const std::string &getGenerator() const { return m_generator; }
 
     const nodeMap_t     &getNodes() const { return m_nodes; }
     const wayMap_t      &getWays() const { return m_ways; }
     const relationMap_t &getRelations() const { return m_relations; }
+    const userMap_t     &getUsers() const { return m_userDetails; }
 };
 
 #endif // DATA_HPP
