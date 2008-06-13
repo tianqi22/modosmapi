@@ -71,7 +71,7 @@ int main( int argc, char **argv )
         {
             userRow_t newUser;
 
-            newUser.get<0>() = "blah@blah.com";
+            newUser.get<0>() = v.second + "@blah.com";
             newUser.get<1>() = v.first;
             newUser.get<4>() = now;
             newUser.get<5>() = v.second;
@@ -91,11 +91,6 @@ int main( int argc, char **argv )
     catch ( const xercesc::XMLException &toCatch )
     {
         std::cerr << "Exception thrown in XML parse" << std::endl;
-        throw;
-    }
-    catch ( const modosmapi::SqlException &e )
-    {
-        std::cerr << std::string( "Exception thrown with message: " ) << e.getMessage() << std::endl;
         throw;
     }
     catch ( const std::exception &e )

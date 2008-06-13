@@ -38,7 +38,7 @@ namespace modosmapi
         bool next();
 
         template<typename T> T getField( size_t index );
-
+        
         template<typename T>
         void readRow( boost::tuples::cons<T, boost::tuples::null_type> &t, size_t index=0 );
 

@@ -47,9 +47,11 @@ MODOSM_SOURCES 		:= $(wildcard $(MODOSM_DIR)/*.cpp)
 MODOSM_OBJECTS 		:= $(MODOSM_SOURCES:%.cpp=$(BUILD_DIR)/%.o)
 UNIT_TEST_TARGET	:= $(BIN_DIR)/unittests
 UE_TARGET		    := $(BIN_DIR)/userextractor
+OSMCOMPARE_TARGET	:= $(BIN_DIR)/osmcompare
 ALL_TARGETS			+= $(MODOSM_TARGET)
 ALL_TARGETS			+= $(UNIT_TEST_TARGET)
 ALL_TARGETS			+= $(UE_TARGET)
+ALL_TARGETS			+= $(OSMCOMPARE_TARGET)
 -include $(MODOSM_OBJECTS:%.o=%.d)
 
 
@@ -73,6 +75,14 @@ $(UE_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm
 	$(Q)$(ECHO)	" [LINK] $(@F)"
 	$(Q)$(MKDIR) $(@D)
 	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
+
+$(OSMCOMPARE_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
+$(OSMCOMPARE_TARGET)	: LDFLAGS := -fPIC
+$(OSMCOMPARE_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	 testing/osm_xml_compare.cpp
+	$(Q)$(ECHO)	" [LINK] $(@F)"
+	$(Q)$(MKDIR) $(@D)
+	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
+
 
 # Common compile rule
 $(BUILD_DIR)/%.o : %.cpp
