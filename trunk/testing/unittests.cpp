@@ -69,7 +69,6 @@ void testDbHandler()
 
 void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
 {
-
     xercesc::SAX2XMLReaderImpl &parser = x.getParser();
 
     boost::shared_ptr<XMLNodeData> startNdData( new XMLNodeData() );

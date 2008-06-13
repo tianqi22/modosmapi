@@ -34,8 +34,8 @@ namespace modosmapi
             m_res = NULL;
             m_row = NULL;
         }
+        m_bulkInsertBuf.clear();
     }
-
 
 
     void DbConnection::executeNoResult( std::string query )
@@ -81,16 +81,18 @@ namespace modosmapi
 
     void DbConnection::bindArg( MYSQL_BIND &args, const std::string &value )
     {
-        args.buffer_type = MYSQL_TYPE_STRING;
+        boost::shared_array<char> buf( new char[value.size()] );
+        m_bulkInsertBuf.push_back( buf );
 
-        // TODO: WILL NOT WORK - BUFFER NOT AVAILABLE FOR LONG ENOUGH
-        args.buffer = const_cast<char *>( "BLAH" );
-        args.buffer_length = 4;
+        memcpy( buf.get(), value.c_str(), value.size() );
+
+        args.buffer_type = MYSQL_TYPE_STRING;
+        args.buffer = buf.get();
+        args.buffer_length = value.size();
         args.is_null = 0;
 
         // TODO: WHAT TO DO ABOUT THIS RETURNED LENGTH?
-        unsigned long str_length;
-        args.length = &str_length;
+        args.length = 0;
     }
 
     void DbConnection::bindArg( MYSQL_BIND &args, const int &value )
@@ -134,16 +136,19 @@ namespace modosmapi
 
     void DbConnection::bindArg( MYSQL_BIND &args, const boost::posix_time::ptime &datetime )
     {
-        MYSQL_TIME ts;
-        ts.year   = datetime.date().year();
-        ts.month  = datetime.date().month();
-        ts.day    = datetime.date().day();
-        ts.hour   = datetime.time_of_day().hours();
-        ts.minute = datetime.time_of_day().minutes();
-        ts.second = datetime.time_of_day().seconds();
+        boost::shared_array<char> buf( new char[sizeof(MYSQL_TIME)/sizeof(char)] );
+        m_bulkInsertBuf.push_back( buf );
+        
+        MYSQL_TIME *ts = reinterpret_cast<MYSQL_TIME *>( buf.get() );
+        ts->year   = datetime.date().year();
+        ts->month  = datetime.date().month();
+        ts->day    = datetime.date().day();
+        ts->hour   = datetime.time_of_day().hours();
+        ts->minute = datetime.time_of_day().minutes();
+        ts->second = datetime.time_of_day().seconds();
 
         args.buffer_type = MYSQL_TYPE_TIMESTAMP;
-        args.buffer = reinterpret_cast<char *>( &ts );
+        args.buffer = reinterpret_cast<char *>( buf.get() );
         args.is_null = 0;
         args.length = 0;
     }
