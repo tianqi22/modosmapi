@@ -26,33 +26,33 @@ class OSMFragment;
 class OSMNode
 {
 private:
-    id_t               m_id;
+    dbId_t             m_id;
     double             m_lat;
     double             m_lon;
     string_t           m_timestamp;
     string_t           m_user;
-    id_t               m_userId;
+    dbId_t             m_userId;
 
     tagMap_t           m_tags;
 
 public:
     OSMNode( OSMFragment &frag, XMLNodeData &data );
 
-    id_t getId() const { return m_id; }
-    void readTag( XMLNodeData &data );
+    dbId_t getId() const { return m_id; }
+    void   readTag( XMLNodeData &data );
     const tagMap_t &getTags() const { return m_tags; }
 };
 
 class OSMWay
 {
 private:
-    id_t               m_id;
+    dbId_t               m_id;
     bool               m_visible;
     string_t           m_timestamp;
     string_t           m_user;
-    id_t               m_userId;
+    dbId_t               m_userId;
 
-    std::vector<id_t>  m_nodes;
+    std::vector<dbId_t>  m_nodes;
     tagMap_t           m_tags;
 
 public:
@@ -60,22 +60,22 @@ public:
     void readTag( XMLNodeData &data );
     void readNd( XMLNodeData &data );
 
-    id_t getId() const { return m_id; }
+    dbId_t getId() const { return m_id; }
     bool getVisible() const { return m_visible; }
     const string_t &getTimeStamp() { return m_timestamp; }
     const string_t &getUser() { return m_user; }
 
-    const std::vector<id_t> &getNodes() const { return m_nodes; }
+    const std::vector<dbId_t> &getNodes() const { return m_nodes; }
     const tagMap_t &getTags() const { return m_tags; }
 };
 
 class OSMRelation
 {
 private:
-    id_t m_id;
+    dbId_t   m_id;
     string_t m_timestamp;
     string_t m_user;
-    id_t m_userId;
+    dbId_t   m_userId;
 
     tagMap_t m_tags;
     std::vector<member_t> m_members;
@@ -85,7 +85,7 @@ public:
     void readMember( XMLNodeData &data );
     void readTag( XMLNodeData &data );
 
-    id_t getId() const { return m_id; }
+    dbId_t getId() const { return m_id; }
     const tagMap_t &getTags() const { return m_tags; }
     const std::vector<member_t> &getMembers() const { return m_members; }
 };
@@ -93,10 +93,10 @@ public:
 class OSMFragment
 {
 public:
-    typedef std::map<id_t, boost::shared_ptr<OSMNode> >     nodeMap_t;
-    typedef std::map<id_t, boost::shared_ptr<OSMWay> >      wayMap_t;
-    typedef std::map<id_t, boost::shared_ptr<OSMRelation> > relationMap_t;
-    typedef std::map<id_t, std::string>                     userMap_t;
+    typedef std::map<dbId_t, boost::shared_ptr<OSMNode> >     nodeMap_t;
+    typedef std::map<dbId_t, boost::shared_ptr<OSMWay> >      wayMap_t;
+    typedef std::map<dbId_t, boost::shared_ptr<OSMRelation> > relationMap_t;
+    typedef std::map<dbId_t, std::string>                     userMap_t;
 
 private:
     std::string m_version;
@@ -114,7 +114,7 @@ public:
     void readWay( XMLNodeData &data );
     void readRelation( XMLNodeData &data );
 
-    void addUser( id_t userId, const std::string &userName );
+    void addUser( dbId_t userId, const std::string &userName );
 
     const std::string &getVersion() const { return m_version; }
     const std::string &getGenerator() const { return m_generator; }

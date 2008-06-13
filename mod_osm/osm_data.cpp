@@ -16,7 +16,7 @@ OSMNode::OSMNode( OSMFragment &frag, XMLNodeData &data )
         ( "lon", m_lon )
         ( "timestamp", m_timestamp )
         ( "user", m_user, true, std::string( "none" ) )
-        ( "uid", m_userId, true, id_t( 0 ) );
+        ( "uid", m_userId, true, dbId_t( 0 ) );
 
     if ( m_user != "none" && m_userId != 0 )
     {
@@ -42,7 +42,7 @@ OSMWay::OSMWay( OSMFragment &frag, XMLNodeData &data )
         ( "timestamp", m_timestamp )
         //( "visible", m_visible )
         ( "user", m_user, true, std::string( "none" ) )
-        ( "uid", m_userId, true, id_t( 0 ) );
+        ( "uid", m_userId, true, dbId_t( 0 ) );
 
     if ( m_user != "none" && m_userId != 0 )
     {
@@ -74,7 +74,7 @@ OSMRelation::OSMRelation( OSMFragment &frag, XMLNodeData &data )
         ( "id", m_id )
         ( "timestamp", m_timestamp )
         ( "user", m_user, true, std::string( "none" ) )
-        ( "uid", m_userId, true, id_t( 0 ) );
+        ( "uid", m_userId, true, dbId_t( 0 ) );
 
     if ( m_user != "none" && m_userId != 0 )
     {
@@ -136,7 +136,7 @@ void OSMFragment::readRelation( XMLNodeData &data )
     m_relations.insert( std::make_pair( newRelation->getId(), newRelation ) );
 }
 
-void OSMFragment::addUser( id_t userId, const std::string &userName )
+void OSMFragment::addUser( dbId_t userId, const std::string &userName )
 {
     if ( m_userDetails.find( userId ) == m_userDetails.end() )
     {
