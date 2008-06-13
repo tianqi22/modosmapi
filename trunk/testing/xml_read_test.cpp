@@ -6,6 +6,7 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 
+#include <boost/test/unit_test.hpp>
 
 void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
 {
@@ -53,7 +54,8 @@ void testXMLRead( XercesInitWrapper &x )
 
 }
 
-int main( int argc, char **argv )
+
+void xmlParseTestFn()
 {
     try
     {
@@ -73,4 +75,14 @@ int main( int argc, char **argv )
     }
 
     return 0;
+}
+
+
+test_suite *init_unit_test_suite( int argc, char **argv )
+{
+    test_suite *test = BOOST_TEST_SUITE( "Master test suite" );
+
+    test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
+
+    return test;
 }
