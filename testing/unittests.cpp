@@ -1,5 +1,6 @@
 #include "xml_reader.hpp"
 #include "osm_data.hpp"
+#include "dbhandler.hpp"
 
 #include <string>
 #include <iostream>
@@ -8,6 +9,62 @@
 #include <boost/foreach.hpp>
 
 #include <boost/test/included/unit_test.hpp>
+
+void testDbHandler()
+{
+    try
+    {
+        modosmapi::DbConnection db( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
+
+        db.executeNoResult( "CREATE TEMPORARY TABLE test_temp( id INT, value INT, PRIMARY KEY(id) )" );
+        db.executeNoResult( "INSERT INTO test_temp VALUES ( 1, 2 ), (3, 4)" );
+
+        db.execute( "SELECT * FROM test_temp ORDER BY id" );
+        BOOST_CHECK_EQUAL( db.getField<int>( 0 ), 1 );
+        BOOST_CHECK_EQUAL( db.getField<int>( 1 ), 2 );
+
+        boost::tuple<int, int> testTuple;
+        db.readRow( testTuple );
+
+        BOOST_CHECK_EQUAL( testTuple.get<0>(), 1 );
+        BOOST_CHECK_EQUAL( testTuple.get<1>(), 2 );
+
+        db.next();
+
+        BOOST_CHECK_EQUAL( db.getField<int>( 0 ), 3 );
+        BOOST_CHECK_EQUAL( db.getField<int>( 1 ), 4 );
+
+        db.executeNoResult( "DELETE FROM test_temp" );
+        db.execute( "SELECT COUNT(*) from test_temp" );
+        
+        BOOST_CHECK_EQUAL( db.getField<int>( 0 ), 0 );
+
+        std::vector<boost::tuple<int, int> > bulkInsertVec;
+        for ( int i = 0; i < 1000; i++ )
+        {
+            bulkInsertVec.push_back( boost::make_tuple( i, i * 3 ) );
+        }
+
+        db.executeBulkInsert( "INSERT INTO test_temp VALUES( ?, ? )", bulkInsertVec );
+
+        db.execute( "SELECT COUNT(*) FROM test_temp" );
+        BOOST_CHECK_EQUAL( db.getField<int>( 0 ), 1000 );
+
+        db.execute( "SELECT * FROM test_temp ORDER BY id" );
+        for ( int i = 0; i < 1000; i++ )
+        {
+            BOOST_CHECK_EQUAL( db.getField<int>( 0 ), i );
+            BOOST_CHECK_EQUAL( db.getField<int>( 1 ), i * 3 );
+            db.next();
+        }
+
+        db.executeNoResult( "DROP TABLE test_temp" );
+    }
+    catch( modosmapi::SqlException &e )
+    {
+        BOOST_FAIL( std::string( "Exception thrown with message: " ) + e.getMessage() );
+    }
+}
 
 
 void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
@@ -53,13 +110,13 @@ void testXMLRead( std::string fileName, XercesInitWrapper &x )
 }
 
 
-void xmlParseTestFn( std::string fileName )
+void xmlParseTestFn()
 {
     try
     {
         XercesInitWrapper x;
         
-        testXMLRead( fileName, x );
+        testXMLRead( "testing/testinput.xml", x );
     }
     catch ( const xercesc::XMLException &toCatch )
     {
@@ -78,15 +135,8 @@ boost::unit_test::test_suite* init_unit_test_suite( int argc, char **argv )
 {
     boost::unit_test::test_suite *test = BOOST_TEST_SUITE( "Master test suite" );
 
-    if ( argc != 2 )
-    {
-        std::cerr << "Incorrect usage: please supply input xml file name" << std::endl;
-        exit( -1 );
-    }
-    
-    std::string testFileName = argv[1];
-
-    test->add( BOOST_TEST_CASE( boost::bind( &xmlParseTestFn, testFileName ) ) );
+    test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
+    test->add( BOOST_TEST_CASE( &testDbHandler ) );
 
     return test;
 }

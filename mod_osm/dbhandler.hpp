@@ -15,7 +15,7 @@ namespace modosmapi
 
     public:
         SqlException( const std::string &message ) : m_message( message ) { }
-        virtual ~SqlException() throw () { }
+        virtual ~SqlException() throw () {}
         const std::string &getMessage() const { return m_message; }
     };
 
@@ -31,34 +31,34 @@ namespace modosmapi
 
         void cleanUp();
 
-        void execute_noresult( std::string query );
+        void executeNoResult( std::string query );
         void execute( std::string query );
         bool next();
 
         template<typename T> T getField( size_t index );
+
         template<typename T>
         void readRow( boost::tuples::cons<T, boost::tuples::null_type> &t, size_t index=0 );
-
-
-        void bindArg( MYSQL_BIND *args, const std::string &value, int offset );
-        void bindArg( MYSQL_BIND *args, boost::uint64_t value, int offset );
-        void bindArg( MYSQL_BIND *args, boost::int64_t value, int offset );
-        void bindArg( MYSQL_BIND *args, double value, int offset );
-        void bindArg( MYSQL_BIND *args, bool value, int offset );
-        void bindArg( MYSQL_BIND *args, const boost::posix_time::ptime &datetime, int offset );
-
-        // e.g. INSERT INTO blah VALUES ( ?, ?, ?, ? )
-        template<typename T> void execute_bulk_insert( std::string query, const std::vector<T> &rows );
-
-        template<typename T1, typename T2>
-        void bindArgsRec( MYSQL_BIND *args, boost::tuples::cons<T1, T2> &row, int offset );
-
-        template<typename T>
-        void bindArgsRec( MYSQL_BIND *args, boost::tuples::cons<T, boost::tuples::null_type> &row, int offset );
 
         template<typename T1, typename T2>
         void readRow( boost::tuples::cons<T1, T2> &t, size_t index=0 );
 
+        template<typename T> void executeBulkInsert( std::string query, const std::vector<T> &rows );
+
+    private:
+        void bindArg( MYSQL_BIND &args, const std::string &value );
+        void bindArg( MYSQL_BIND &args, const int &value );
+        void bindArg( MYSQL_BIND &args, const boost::uint64_t &value );
+        void bindArg( MYSQL_BIND &args, const boost::int64_t &value );
+        void bindArg( MYSQL_BIND &args, const double &value );
+        void bindArg( MYSQL_BIND &args, const bool &value );
+        void bindArg( MYSQL_BIND &args, const boost::posix_time::ptime &datetime );
+
+        template<typename B, typename T1, typename T2>
+        void bindArgsRec( B &args, const boost::tuples::cons<T1, T2> &row, int offset );
+
+        template<typename B, typename T>
+        void bindArgsRec( B &args, const boost::tuples::cons<T, boost::tuples::null_type> &row, int offset );
 
     private:
         MYSQL m_dbconn;
