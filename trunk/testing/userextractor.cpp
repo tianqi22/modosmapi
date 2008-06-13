@@ -51,7 +51,7 @@ int main( int argc, char **argv )
 
         typedef boost::tuples::cons<
             std::string,              boost::tuples::cons<
-            id_t,                     boost::tuples::cons<
+            dbId_t,                   boost::tuples::cons<
             int,                      boost::tuples::cons<
             std::string,              boost::tuples::cons<
             boost::posix_time::ptime, boost::tuples::cons<
