@@ -192,7 +192,7 @@ namespace modosmapi
 
         BOOST_FOREACH (const std::string &command, setup)
         {
-            dbConn.execute_noresult (command);
+            dbConn.executeNoResult (command);
         }
 
         dbConn.execute( "SELECT COUNT(*) FROM temp_way_ids" );
@@ -411,9 +411,9 @@ namespace modosmapi
         out << xml::dec;
         out << xml::indent << "</osm>\n";
 
-        dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
-        dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
-        dbConn.execute_noresult( "DROP TABLE temp_relation_ids" );
+        dbConn.executeNoResult( "DROP TABLE temp_way_ids" );
+        dbConn.executeNoResult( "DROP TABLE temp_node_ids" );
+        dbConn.executeNoResult( "DROP TABLE temp_relation_ids" );
     
 
         // Similarly: SELECT ways.* FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id

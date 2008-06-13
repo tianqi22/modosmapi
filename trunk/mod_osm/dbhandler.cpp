@@ -38,11 +38,10 @@ namespace modosmapi
 
 
 
-    void DbConnection::execute_noresult( std::string query )
+    void DbConnection::executeNoResult( std::string query )
     {
         cleanUp();
 
-        std::cout << "Executing query: " << query << std::endl;
         if ( mysql_query( &m_dbconn, query.c_str() ) )
         {
             throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
@@ -54,7 +53,6 @@ namespace modosmapi
     {
         cleanUp();
 
-        std::cout << "Executing query: " << query << std::endl;
         if ( mysql_query( &m_dbconn, query.c_str() ) )
         {
             throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
@@ -81,50 +79,60 @@ namespace modosmapi
     }
 
 
-    void bindArg( MYSQL_BIND *args, const std::string &value, int offset )
+    void DbConnection::bindArg( MYSQL_BIND &args, const std::string &value )
     {
-        args[offset].buffer_type = MYSQL_TYPE_STRING;
+        args.buffer_type = MYSQL_TYPE_STRING;
 
         // TODO: WILL NOT WORK - BUFFER NOT AVAILABLE FOR LONG ENOUGH
-        args[offset].buffer = const_cast<char *>( "BLAH" );
-        args[offset].buffer_length = 4;
-        args[offset].is_null = 0;
+        args.buffer = const_cast<char *>( "BLAH" );
+        args.buffer_length = 4;
+        args.is_null = 0;
 
         // TODO: WHAT TO DO ABOUT THIS RETURNED LENGTH?
         unsigned long str_length;
-        args[offset].length = &str_length;
+        args.length = &str_length;
     }
 
-    void bindArg( MYSQL_BIND *args, boost::uint64_t value, int offset )
+    void DbConnection::bindArg( MYSQL_BIND &args, const int &value )
     {
-        args[offset].buffer_type = MYSQL_TYPE_LONGLONG;
-        args[offset].buffer = reinterpret_cast<char *>( &value );
-        args[offset].is_unsigned = 1;
-        args[offset].is_null = 0;
-        args[offset].length = 0;
+        args.buffer_type = MYSQL_TYPE_LONG;
+        args.buffer = reinterpret_cast<char *>( const_cast<int *>( &value ) );
+        args.is_unsigned = 0;
+        args.is_null = 0;
+        args.length = 0;
     }
 
-    void bindArg( MYSQL_BIND *args, boost::int64_t value, int offset )
+
+    void DbConnection::bindArg( MYSQL_BIND &args, const boost::uint64_t &value )
     {
-        args[offset].buffer_type = MYSQL_TYPE_LONGLONG;
-        args[offset].buffer = reinterpret_cast<char *>( &value );
-        args[offset].is_unsigned = 0;
-        args[offset].is_null = 0;
-        args[offset].length = 0;
+        args.buffer_type = MYSQL_TYPE_LONGLONG;
+        args.buffer = reinterpret_cast<char *>( const_cast<boost::uint64_t *>( &value ) );
+        args.is_unsigned = 1;
+        args.is_null = 0;
+        args.length = 0;
+    }
+
+    void DbConnection::bindArg( MYSQL_BIND &args, const boost::int64_t &value )
+    {
+        args.buffer_type = MYSQL_TYPE_LONGLONG;
+        args.buffer = reinterpret_cast<char *>( const_cast<boost::int64_t *>( &value ) );
+        args.is_unsigned = 0;
+        args.is_null = 0;
+        args.length = 0;
     }
     
-    void bindArg( MYSQL_BIND *args, double value, int offset )
+    void DbConnection::bindArg( MYSQL_BIND &args, const double &value )
     {
-        args[offset].buffer_type = MYSQL_TYPE_DOUBLE;
-        args[offset].buffer = reinterpret_cast<char *>( &value );
-        args[offset].is_null = 0;
+        args.buffer_type = MYSQL_TYPE_DOUBLE;
+        args.buffer = reinterpret_cast<char *>( const_cast<double *>( &value ) );
+        args.is_null = 0;
     }
 
-    void bindArg( MYSQL_BIND *args, bool value, int offset )
+    void DbConnection::bindArg( MYSQL_BIND &args, const bool &value )
     {
     }
 
-    void bindArg( MYSQL_BIND *args, const boost::posix_time::ptime &datetime, int offset )
+    void DbConnection::bindArg( MYSQL_BIND &args, const boost::posix_time::ptime &datetime )
     {
         MYSQL_TIME ts;
         ts.year   = datetime.date().year();
@@ -134,10 +142,10 @@ namespace modosmapi
         ts.minute = datetime.time_of_day().minutes();
         ts.second = datetime.time_of_day().seconds();
 
-        args[offset].buffer_type = MYSQL_TYPE_TIMESTAMP;
-        args[offset].buffer = reinterpret_cast<char *>( &ts );
-        args[offset].is_null = 0;
-        args[offset].length = 0;
+        args.buffer_type = MYSQL_TYPE_TIMESTAMP;
+        args.buffer = reinterpret_cast<char *>( &ts );
+        args.is_null = 0;
+        args.length = 0;
     }
 
 
