@@ -1,12 +1,14 @@
 #include "xml_reader.hpp"
 #include "osm_data.hpp"
 
+#include <string>
 #include <iostream>
 #include <boost/shared_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 
-#include <boost/test/unit_test.hpp>
+#include <boost/test/included/unit_test.hpp>
+
 
 void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
 {
@@ -25,15 +27,11 @@ void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment 
     parser.parse( fileName.c_str() );
 }
 
-#define BOOST_CHECK_EQUAL( a, b ) if ( (a) != (b) ) { \
-        std::cerr << "Check equal failed: " << a << " != " << b << " (" << __FILE__ << ", " << __LINE__ << ")" << std::endl; \
-    } else {}
 
-
-void testXMLRead( XercesInitWrapper &x )
+void testXMLRead( std::string fileName, XercesInitWrapper &x )
 {
     OSMFragment newFragment;
-    readOSMXML( x, "./testinput.xml", newFragment );
+    readOSMXML( x, fileName.c_str(), newFragment );
 
     BOOST_CHECK_EQUAL( newFragment.getVersion(), "0.5" );
     BOOST_CHECK_EQUAL( newFragment.getGenerator(), "OpenStreetMap server" );
@@ -55,34 +53,41 @@ void testXMLRead( XercesInitWrapper &x )
 }
 
 
-void xmlParseTestFn()
+void xmlParseTestFn( std::string fileName )
 {
     try
     {
         XercesInitWrapper x;
         
-        testXMLRead( x );       
+        testXMLRead( fileName, x );
     }
     catch ( const xercesc::XMLException &toCatch )
     {
         std::cerr << "Exception thrown in XML parse" << std::endl;
-        return -1;
+        throw;
     }
     catch ( const std::exception &e )
     {
         std::cerr << "Exception thrown in XML parse: " << e.what() << std::endl;
-        return -1;
+        throw;
     }
-
-    return 0;
 }
 
 
-test_suite *init_unit_test_suite( int argc, char **argv )
+boost::unit_test::test_suite* init_unit_test_suite( int argc, char **argv )
 {
-    test_suite *test = BOOST_TEST_SUITE( "Master test suite" );
+    boost::unit_test::test_suite *test = BOOST_TEST_SUITE( "Master test suite" );
 
-    test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
+    if ( argc != 2 )
+    {
+        std::cerr << "Incorrect usage: please supply input xml file name" << std::endl;
+        exit( -1 );
+    }
+    
+    std::string testFileName = argv[1];
+
+    test->add( BOOST_TEST_CASE( boost::bind( &xmlParseTestFn, testFileName ) ) );
 
     return test;
 }
+

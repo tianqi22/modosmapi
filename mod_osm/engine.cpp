@@ -423,30 +423,30 @@ namespace modosmapi
 
 } // end namespace modosmapi
 
-int main( int argc, char *argv [] )
-{
-    try
-    {
-        double minLat = 515000000;
-        double maxLat = 520000000;
-        double minLon = -10000000;
-        double maxLon = -9000000;
+// int main( int argc, char *argv [] )
+// {
+//     try
+//     {
+//         double minLat = 515000000;
+//         double maxLat = 520000000;
+//         double minLon = -10000000;
+//         double maxLon = -9000000;
 
-        std::ofstream opFile( "test_result.txt" );
-        modosmapi::Context c;
-        modosmapi::map(opFile, c, minLat, maxLat, minLon, maxLon );
-    }
-    catch ( const modosmapi::SqlException &e )
-    {
-        std::cout << "SQL exception thrown: " << e.getMessage() << std::endl;
-        return -1;
-    }
-    catch ( const std::exception &e )
-    {
-        std::cout << "std::exception thrown: " << e.what() << std::endl;
-        throw;
-    }
+//         std::ofstream opFile( "test_result.txt" );
+//         modosmapi::Context c;
+//         modosmapi::map(opFile, c, minLat, maxLat, minLon, maxLon );
+//     }
+//     catch ( const modosmapi::SqlException &e )
+//     {
+//         std::cout << "SQL exception thrown: " << e.getMessage() << std::endl;
+//         return -1;
+//     }
+//     catch ( const std::exception &e )
+//     {
+//         std::cout << "std::exception thrown: " << e.what() << std::endl;
+//         throw;
+//     }
 
-    return 0;
-}
+//     return 0;
+// }
 
