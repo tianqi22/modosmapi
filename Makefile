@@ -32,7 +32,7 @@ CPPFLAGS    += -Imod_osm
 CPPFLAGS    += $(APACHE_CPPFLAGS)
 
 CXXFLAGS    += -Wall -Werror
-#CXXFLAGS    += -O2
+CXXFLAGS    += -O2
 CXXFLAGS    += -fexceptions -finline-functions
 CXXFLAGS    += -g
 
@@ -46,8 +46,10 @@ MODOSM_TARGET  		:= $(LIB_DIR)/mod_osm.so
 MODOSM_SOURCES 		:= $(wildcard $(MODOSM_DIR)/*.cpp)
 MODOSM_OBJECTS 		:= $(MODOSM_SOURCES:%.cpp=$(BUILD_DIR)/%.o)
 UNIT_TEST_TARGET	:= $(BIN_DIR)/unittests
+UE_TARGET		    := $(BIN_DIR)/userextractor
 ALL_TARGETS			+= $(MODOSM_TARGET)
 ALL_TARGETS			+= $(UNIT_TEST_TARGET)
+ALL_TARGETS			+= $(UE_TARGET)
 -include $(MODOSM_OBJECTS:%.o=%.d)
 
 
@@ -60,7 +62,14 @@ $(MODOSM_TARGET) : $(MODOSM_OBJECTS)
 
 $(UNIT_TEST_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
 $(UNIT_TEST_TARGET)	: LDFLAGS := -fPIC
-$(UNIT_TEST_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o testing/unittests.cpp
+$(UNIT_TEST_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	 testing/unittests.cpp
+	$(Q)$(ECHO)	" [LINK] $(@F)"
+	$(Q)$(MKDIR) $(@D)
+	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
+
+$(UE_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
+$(UE_TARGET)	: LDFLAGS := -fPIC
+$(UE_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	 testing/userextractor.cpp
 	$(Q)$(ECHO)	" [LINK] $(@F)"
 	$(Q)$(MKDIR) $(@D)
 	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)

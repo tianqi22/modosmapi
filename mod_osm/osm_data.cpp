@@ -18,7 +18,7 @@ OSMNode::OSMNode( OSMFragment &frag, XMLNodeData &data )
         ( "user", m_user, true, std::string( "none" ) )
         ( "uid", m_userId, true, id_t( 0 ) );
 
-    if ( m_user != "none" and m_userId != 0 )
+    if ( m_user != "none" && m_userId != 0 )
     {
         frag.addUser( m_userId, m_user );
     }
@@ -44,7 +44,7 @@ OSMWay::OSMWay( OSMFragment &frag, XMLNodeData &data )
         ( "user", m_user, true, std::string( "none" ) )
         ( "uid", m_userId, true, id_t( 0 ) );
 
-    if ( m_user != "none" and m_userId != 0 )
+    if ( m_user != "none" && m_userId != 0 )
     {
         frag.addUser( m_userId, m_user );
     }
@@ -76,7 +76,7 @@ OSMRelation::OSMRelation( OSMFragment &frag, XMLNodeData &data )
         ( "user", m_user, true, std::string( "none" ) )
         ( "uid", m_userId, true, id_t( 0 ) );
 
-    if ( m_user != "none" and m_userId != 0 )
+    if ( m_user != "none" && m_userId != 0 )
     {
         frag.addUser( m_userId, m_user );
     }
@@ -138,7 +138,7 @@ void OSMFragment::readRelation( XMLNodeData &data )
 
 void OSMFragment::addUser( id_t userId, const std::string &userName )
 {
-    if ( m_userDetails.find( userId ) != m_userDetails.end() )
+    if ( m_userDetails.find( userId ) == m_userDetails.end() )
     {
         m_userDetails.insert( std::make_pair( userId, userName ) );
     }
