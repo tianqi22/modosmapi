@@ -414,11 +414,6 @@ namespace modosmapi
         dbConn.executeNoResult( "DROP TABLE temp_way_ids" );
         dbConn.executeNoResult( "DROP TABLE temp_node_ids" );
         dbConn.executeNoResult( "DROP TABLE temp_relation_ids" );
-    
-
-        // Similarly: SELECT ways.* FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id
-        //            SELECT way_nodes.* FROM way_nodes INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id
-        //            (and way_tags and relations)
     }
 
 } // end namespace modosmapi

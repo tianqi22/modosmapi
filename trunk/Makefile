@@ -53,7 +53,7 @@ ALL_TARGETS			+= $(UE_TARGET)
 -include $(MODOSM_OBJECTS:%.o=%.d)
 
 
-$(MODOSM_TARGET) : LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS)
+$(MODOSM_TARGET) : LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
 $(MODOSM_TARGET) : LDFLAGS := -shared -fPIC
 $(MODOSM_TARGET) : $(MODOSM_OBJECTS)
 	$(Q)$(ECHO) " [LINK] $(@F)"
@@ -81,6 +81,12 @@ $(BUILD_DIR)/%.o : %.cpp
 	$(Q)$(COMPILE.cpp) $< -MD $(OUTPUT_OPTION)
 
 .PHONY: default all clean
+
+
+install:
+	cp $(MODOSM_TARGET) /usr/lib/apache2/modules
+	apache2ctl stop
+	apache2ctl start
 
 all : $(ALL_TARGETS)
 
