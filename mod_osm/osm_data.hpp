@@ -38,8 +38,9 @@ private:
 public:
     OSMNode( OSMFragment &frag, XMLNodeData &data );
 
-    dbId_t getId() const { return m_id; }
     void   readTag( XMLNodeData &data );
+
+    dbId_t getId() const { return m_id; }
     const tagMap_t &getTags() const { return m_tags; }
 };
 

@@ -26,6 +26,37 @@ void compareOSMXML( const OSMFragment &frag1, const OSMFragment &frag2 )
     requireEqual( frag1.getNodes().size(), frag2.getNodes().size(), "Number of nodes does not match" );
     requireEqual( frag1.getWays().size(), frag2.getWays().size(), "Number of ways does not match" );
     requireEqual( frag1.getRelations().size(), frag2.getRelations().size(), "Number of relations does not match" );
+
+    BOOST_FOREACH( const OSMFragment::nodeMap_t::value_type &v, frag1.getNodes() )
+    {
+        OSMFragment::nodeMap_t::const_iterator findIt = frag2.getNodes().find( v.first );
+
+        if ( findIt == frag2.getNodes().end() )
+        {
+            std::cerr << "Node id " << v.first << " missing in file 2" << std::endl;
+        }
+
+    }
+  
+    BOOST_FOREACH( const OSMFragment::wayMap_t::value_type &v, frag1.getWays() )
+    {
+        OSMFragment::wayMap_t::const_iterator findIt = frag2.getWays().find( v.first );
+
+        if ( findIt == frag2.getWays().end() )
+        {
+            std::cerr << "Way id " << v.first << " missing in file 2" << std::endl;
+        }
+    }
+
+    BOOST_FOREACH( const OSMFragment::relationMap_t::value_type &v, frag1.getRelations() )
+    {
+        OSMFragment::relationMap_t::const_iterator findIt = frag2.getRelations().find( v.first );
+
+        if ( findIt == frag2.getRelations().end() )
+        {
+            std::cerr << "Relation id " << v.first << " missing in file 2" << std::endl;
+        }
+    }
 }
 
 void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
