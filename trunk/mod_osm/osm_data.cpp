@@ -96,8 +96,6 @@ void OSMFragment::build( XMLNodeData &data )
         ( "version", m_version )
         ( "generator", m_generator );
 
-    std::cout << "OSM fragment: " << m_version << ", " << m_generator << std::endl;
-
     data.registerMembers()
         ( "node", boost::bind( &OSMFragment::readNode, this, _1 ) )
         ( "way", boost::bind( &OSMFragment::readWay, this, _1 ) )

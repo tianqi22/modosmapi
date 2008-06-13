@@ -17,6 +17,8 @@ std::string escapeChars( std::string toEscape )
     boost::algorithm::replace_all( toEscape, ">", "&gt;" );
     boost::algorithm::replace_all( toEscape, "'", "&apos;" );
     boost::algorithm::replace_all( toEscape, "\"", "&ltquot;" );
+
+    return toEscape;
 }
 
 std::string transcodeString( const XMLCh *const toTranscode )
@@ -59,7 +61,7 @@ XMLMemberRegistration &XMLMemberRegistration::operator()( const std::string &mem
 
 XMLNodeAttributeMap::XMLNodeAttributeMap( const xercesc::Attributes &attributes )
 {
-    for ( int i = 0; i < attributes.getLength(); i++ )
+    for ( size_t i = 0; i < attributes.getLength(); i++ )
     {
         std::string key   = transcodeString( attributes.getLocalName( i ) );
         std::string value = transcodeString( attributes.getValue( i ) );
