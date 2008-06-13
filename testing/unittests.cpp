@@ -82,6 +82,7 @@ void testDbHandler()
         BOOST_CHECK_EQUAL( db.getField<int>( 2 ), -24 );
         BOOST_CHECK_CLOSE( db.getField<double>( 3 ), 3.141592654, 0.00001 );
         BOOST_CHECK_EQUAL( db.getField<std::string>( 4 ), "World" );
+        std::cout << db.getField<std::string>( 5 ) << std::endl;
         //BOOST_CHECK_EQUAL( db.getField<boost::posix_time::ptime>( 5 ), now );
 
         db.executeNoResult( "DROP TABLE test_temp2" );

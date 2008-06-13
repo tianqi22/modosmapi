@@ -19,6 +19,7 @@ namespace modosmapi
         return boost::lexical_cast<T>( m_row[index] );
     }
 
+
     template<typename B, typename T1, typename T2>
     void DbConnection::bindArgsRec( B &args, const boost::tuples::cons<T1, T2> &row, int offset )
     { 
