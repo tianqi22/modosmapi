@@ -1,5 +1,6 @@
 #include "engine.h"
 #include "ioxml.h"
+#include "dbhandler.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -22,6 +23,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <mysql/mysql.h>
+
+
 
 // <host>/api/0.5select * from relation_tags inner join relations on relations.id=relation_tags.id inner join relation_members on relations.id=relation_members.id where member_id=4221467 and member_type='way'
 //
@@ -47,632 +50,378 @@
 // GET  /api/0.5/user/preferences
 
 
-namespace modosm
+namespace modosmapi
 {
+    typedef boost::tuple<boost::uint64_t, std::string, std::string, boost::uint64_t> wayTag_t;
+    typedef std::pair<std::vector<wayTag_t>::iterator, std::vector<wayTag_t>::iterator> wayTagRange_t;
 
-
-class SqlException : public std::exception
-{
-    std::string m_message;
-
-public:
-    SqlException( const std::string &message ) : m_message( message )
+    struct WayTagLt
     {
-    }
-
-    virtual ~SqlException() throw ()
-    {
-    }
-
-    const std::string &getMessage() const
-    {
-        return m_message;
-    }
-};
-
-
-class DbConnection
-{
-public:
-    DbConnection(
-                 const std::string &dbhost,
-                 const std::string &dbname,
-                 const std::string &dbuser,
-                 const std::string &dbpass ) : m_res( NULL ), m_row( NULL )
-    {
-        if ( created )
+        bool operator()( const wayTag_t &lhs, const wayTag_t &rhs ) const
         {
-            throw SqlException( "Single instance has already been created" );
+            return lhs.get<0>() < rhs.get<0>();
         }
-        created = true;
-
-        if ( !mysql_init( &m_dbconn ) )
+        bool operator()( boost::uint64_t lhs, const wayTag_t &rhs ) const
         {
-            throw SqlException( std::string( "Mysql init failure: " ) + mysql_error( &m_dbconn ) );
+            return lhs < rhs.get<0>();
+        }
+        bool operator()( const wayTag_t &lhs, boost::uint64_t rhs ) const
+        {
+            return lhs.get<0>() < rhs;
         }
 
-        if ( !mysql_real_connect( &m_dbconn, dbhost.c_str(), dbname.c_str(), dbuser.c_str(), dbpass.c_str(), 0, NULL, 0 ) )
-        {
-            throw SqlException( std::string( "Mysql connection failed: " ) + mysql_error( &m_dbconn ) );
-        }
-    }
-
-    void cleanUp()
-    {
-        if ( m_res )
-        {
-            mysql_free_result( m_res );
-            m_res = NULL;
-            m_row = NULL;
-        }
-    }
-
-    // e.g. INSERT INTO blah VALUES ( ?, ?, ?, ? )
-
-    template<typename T>
-    void execute_bulk_insert( std::string query, const std::vector<T> &rows )
-    {
-        MYSQL_STMT *ps = mysql_stmt_init( &m_dbconn );
-        if ( !ps )
-        {
-            throw SqlException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
-        }
-
-        if ( mysql_stmt_prepare( ps, query.c_str(), query.size() ) )
-        {
-            throw SqlException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
-        }
-
-        MYSQL_BIND args[boost::tuples::length<T>::value];
-        BOOST_FOREACH( const T &row, rows )
-        {
-            memset( args, 0, sizeof( args ) );
-
-            bindArgsRec( args, row, 0 );
-
-            mysql_stmt_bind_param( ps, args );
-
-            if ( mysql_stmt_execute( ps ) )
-            {
-                throw SqlException( std::string( "Statement execute failed: " ) + mysql_error( &m_dbconn ) );
-            }
-        }
-
-        mysql_stmt_close( ps );
-
-    }
-
-    void execute_noresult( std::string query )
-    {
-        cleanUp();
-
-        std::cout << "Executing query: " << query << std::endl;
-        if ( mysql_query( &m_dbconn, query.c_str() ) )
-        {
-            throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
-        }    
-    }
-
-
-    void execute( std::string query )
-    {
-        cleanUp();
-
-        std::cout << "Executing query: " << query << std::endl;
-        if ( mysql_query( &m_dbconn, query.c_str() ) )
-        {
-            throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
-        }
-
-        if ( !(m_res=mysql_use_result( &m_dbconn )) )
-        {
-            throw SqlException( std::string( "Result store failed: " ) + mysql_error( &m_dbconn ) );
-        }
-
-        next();
-    }
-
-    bool next()
-    {
-        if ( !m_res )
-        {
-            throw SqlException( "Cannot call next - no valid result" );
-        }
-
-        m_row = mysql_fetch_row( m_res );
-
-        return m_row;
-    }
-
-    template<typename T>
-    T getField( size_t index )
-    {
-        if ( !m_row || !m_res )
-        {
-            throw SqlException( "Calling getField on empty row. Is query empty or exhausted?" );
-        }
-
-        if ( index > mysql_num_fields( m_res ) )
-        {
-            throw SqlException( "Index greater than number of fields" );
-        }
-        return boost::lexical_cast<T>( m_row[index] );
-    }
-
-    void bindArg( MYSQL_BIND *args, const std::string &value, int offset )
-    {
-        args[offset].buffer_type = MYSQL_TYPE_STRING;
-
-        // TODO: WILL NOT WORK - BUFFER NOT AVAILABLE FOR LONG ENOUGH
-        args[offset].buffer = const_cast<char *>( "BLAH" );
-        args[offset].buffer_length = 4;
-        args[offset].is_null = 0;
-
-        // TODO: WHAT TO DO ABOUT THIS RETURNED LENGTH?
-        unsigned long str_length;
-        args[offset].length = &str_length;
-    }
-
-    void bindArg( MYSQL_BIND *args, boost::uint64_t value, int offset )
-    {
-        args[offset].buffer_type = MYSQL_TYPE_LONGLONG;
-        args[offset].buffer = reinterpret_cast<char *>( &value );
-        args[offset].is_unsigned = 1;
-        args[offset].is_null = 0;
-        args[offset].length = 0;
-    }
-
-    void bindArg( MYSQL_BIND *args, boost::int64_t value, int offset )
-    {
-        args[offset].buffer_type = MYSQL_TYPE_LONGLONG;
-        args[offset].buffer = reinterpret_cast<char *>( &value );
-        args[offset].is_unsigned = 0;
-        args[offset].is_null = 0;
-        args[offset].length = 0;
-    }
-    
-    void bindArg( MYSQL_BIND *args, double value, int offset )
-    {
-        args[offset].buffer_type = MYSQL_TYPE_DOUBLE;
-        args[offset].buffer = reinterpret_cast<char *>( &value );
-        args[offset].is_null = 0;
-    }
-
-    void bindArg( MYSQL_BIND *args, bool value, int offset )
-    {
-    }
-
-    void bindArg( MYSQL_BIND *args, const boost::posix_time::ptime &datetime, int offset )
-    {
-        MYSQL_TIME ts;
-        ts.year   = datetime.date().year();
-        ts.month  = datetime.date().month();
-        ts.day    = datetime.date().day();
-        ts.hour   = datetime.time_of_day().hours();
-        ts.minute = datetime.time_of_day().minutes();
-        ts.second = datetime.time_of_day().seconds();
-
-        args[offset].buffer_type = MYSQL_TYPE_TIMESTAMP;
-        args[offset].buffer = reinterpret_cast<char *>( &ts );
-        args[offset].is_null = 0;
-        args[offset].length = 0;
-    }
-
-
-    template<typename T1, typename T2>
-    void bindArgsRec( MYSQL_BIND *args, boost::tuples::cons<T1, T2> &row, int offset )
-    { 
-        bindArg( args, row.head, offset );
-        bindArgsRec( args, row.tail, offset+1 );
-    }
-
-    template<typename T>
-    void bindArgsRec( MYSQL_BIND *args, boost::tuples::cons<T, boost::tuples::null_type> &row, int offset )
-    {
-        bindArg( args, row.head, offset );
-    }
-
-
-    template<typename T1, typename T2>
-    void readRow( boost::tuples::cons<T1, T2> &t, size_t index=0 )
-    {
-        t.head = getField<T1>( index );
-        readRow( t.tail, index + 1 );
-    }
-
-    template<typename T>
-    void readRow( boost::tuples::cons<T, boost::tuples::null_type> &t, size_t index=0 )
-    {
-        t.head = getField<T>( index );
-    }
-
-
-    ~DbConnection()
-    {
-        cleanUp();
-
-        mysql_close( &m_dbconn );
-    }
-
-private:
-    MYSQL m_dbconn;
-    MYSQL_RES *m_res;
-    MYSQL_ROW m_row;
-
-    static bool created;
-};
-
-/*static*/ bool DbConnection::created = false;
-
-typedef boost::tuple<boost::uint64_t, std::string, std::string, boost::uint64_t> wayTag_t;
-typedef std::pair<std::vector<wayTag_t>::iterator, std::vector<wayTag_t>::iterator> wayTagRange_t;
-
-struct WayTagLt
-{
-    bool operator()( const wayTag_t &lhs, const wayTag_t &rhs ) const
-    {
-        return lhs.get<0>() < rhs.get<0>();
-    }
-    bool operator()( boost::uint64_t lhs, const wayTag_t &rhs ) const
-    {
-        return lhs < rhs.get<0>();
-    }
-    bool operator()( const wayTag_t &lhs, boost::uint64_t rhs ) const
-    {
-        return lhs.get<0>() < rhs;
-    }
-
-};
-
-class XMLWriter
-{
-
-public:
-    XMLWriter( std::ostream &outStream ) : indentLevel( 0 ), m_outStream( outStream )
-    {
-    }
-
-    void startNode( const std::string &nodeName );
-
-    template<typename T>
-    void startNode( const std::string &nodeName, const std::string &attrName, const T &attrValue );
-
-    template<typename T1, typename T2>
-    void startNode( const std::string &nodeName, const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple );
-
-    void endNode( const std::string &nodeName );
-
-private:
-    void writeIndent();
-
-    int indentLevel;
-    std::ostream &m_outStream;
-};
-
-void XMLWriter::writeIndent()
-{
-    m_outStream << std::string( indentLevel * 2, ' ' );
-}
-
-void XMLWriter::startNode( const std::string &nodeName )
-{
-    writeIndent();
-    m_outStream << "<" << nodeName << ">" << std::endl;
-    indentLevel++;
-}
-
-template<typename T>
-void XMLWriter::startNode( const std::string &nodeName, const std::string &attrName, const T &attrValue )
-{
-    writeIndent();
-    m_outStream << "<" << nodeName << " " << attrName << "=\"" << attrValue << "\">" << std::endl;
-    indentLevel++;
-}
-
-template<typename T>
-void renderTags(
-                const boost::tuples::cons<T, boost::tuples::null_type> &tuple,
-                const std::string attrNames[],
-                std::vector<std::string> &tags,
-                int index )
-{
-    std::stringstream ss;
-    ss << attrNames[index] << "=\"" << tuple.head << "\"";
-    tags.push_back( ss.str() );
-}
-
-template<typename T1, typename T2>
-void renderTags(
-                const boost::tuples::cons<T1, T2> &tuple,
-                const std::string attrNames[],
-                std::vector<std::string> &tags,
-                int index )
-{
-    std::stringstream ss;
-    ss << attrNames[index] << "=\"" << tuple.head << "\"";
-    tags.push_back( ss.str() );
-
-    renderTags( tuple.tail, attrNames, tags, index + 1 );
-}
-
-template<typename T1, typename T2>
-void XMLWriter::startNode( const std::string &nodeName, const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple )
-{
-    std::vector<std::string> tags;
-  
-    renderTags( attrValueTuple, attrNames, tags, 0 );
-
-    writeIndent();
-    m_outStream << "<" << nodeName << " " << boost::algorithm::join( tags, " " ) << ">" << std::endl;
-
-    indentLevel++;
-}
-
-void XMLWriter::endNode( const std::string &nodeName )
-{
-    indentLevel--;
-    writeIndent();
-    m_outStream << "</" << nodeName << ">" << std::endl;
-}
-
-void map(std::ostream &out, // destination for output
-         Context &context,      // database connection settings, etc...
-         double minLat, double maxLat, double minLon, double maxLon ) // function specific parameters
-{
-    DbConnection dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
-
-    std::string setup [] =
-    {
-        "CREATE TEMPORARY TABLE temp_node_ids    ( id BIGINT, PRIMARY KEY(id) )",
-        "CREATE TEMPORARY TABLE temp_way_ids     ( id BIGINT, PRIMARY KEY(id) )",
-        "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT, PRIMARY KEY(id) )",
-        boost::str( boost::format(
-        	"INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
-        	"latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
-        		% minLat % maxLat % minLon % maxLon ),
-        "INSERT INTO temp_way_ids SELECT DISTINCT way_nodes.id FROM way_nodes INNER JOIN "
-        	 "temp_node_ids ON way_nodes.node_id=temp_node_ids.id",
-        "INSERT IGNORE INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
-        	"INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id",
-        "INSERT INTO temp_relation_ids SELECT DISTINCT relation_members.id FROM "
-        	"relation_members INNER JOIN temp_node_ids ON relation_members.member_id=temp_node_ids.id "
-                "WHERE member_type='node'",
-        "INSERT IGNORE INTO temp_relation_ids SELECT DISTINCT relation_members.id "
-                "FROM relation_members INNER JOIN temp_way_ids ON relation_members.member_id=temp_way_ids.id "
-                "WHERE member_type='way'",
     };
-    BOOST_FOREACH (const std::string &command, setup)
+
+    class XMLWriter
     {
-        dbConn.execute_noresult (command);
+
+    public:
+        XMLWriter( std::ostream &outStream ) : indentLevel( 0 ), m_outStream( outStream )
+        {
+        }
+
+        void startNode( const std::string &nodeName );
+
+        template<typename T>
+        void startNode( const std::string &nodeName, const std::string &attrName, const T &attrValue );
+
+        template<typename T1, typename T2>
+        void startNode( const std::string &nodeName, const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple );
+
+        void endNode( const std::string &nodeName );
+
+    private:
+        void writeIndent();
+
+        int indentLevel;
+        std::ostream &m_outStream;
+    };
+
+    void XMLWriter::writeIndent()
+    {
+        m_outStream << std::string( indentLevel * 2, ' ' );
     }
 
-    dbConn.execute( "SELECT COUNT(*) FROM temp_way_ids" );
-    std::cout << dbConn.getField<int>( 0 ) << std::endl;
-
-    dbConn.execute( "SELECT COUNT(*) FROM temp_node_ids" );
-    std::cout << dbConn.getField<int>( 0 ) << std::endl;
-
-    // Node attrs: id, lat, lon, user, visible, timestamp
-    // Node children: tags with tag attrs k, v (split of tag line on ; and then =)
-
-    // Way attrs: id, user, visible, timestamp
-    // Way children: nds with nd attr ref (node id)
-
-    dbConn.execute( "SELECT nodes.id, latitude, longitude, visible, timestamp, tags  FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
-    std::cout << "Writing out nodes" << std::endl;
-
-    out << xml::setformat (4, ' ');
-    out << xml::indent << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    out << xml::indent << "<osm version=\"0.5\" generator=\"modosmapi\">\n";
-    out << xml::inc;
-
-    do
+    void XMLWriter::startNode( const std::string &nodeName )
     {
-        const std::string nodeAttrNames[] = { "id", "lat", "lon", "visible", "timestamp" };
-        boost::tuple<
+        writeIndent();
+        m_outStream << "<" << nodeName << ">" << std::endl;
+        indentLevel++;
+    }
+
+    template<typename T>
+    void XMLWriter::startNode( const std::string &nodeName, const std::string &attrName, const T &attrValue )
+    {
+        writeIndent();
+        m_outStream << "<" << nodeName << " " << attrName << "=\"" << attrValue << "\">" << std::endl;
+        indentLevel++;
+    }
+
+    template<typename T>
+    void renderTags(
+                    const boost::tuples::cons<T, boost::tuples::null_type> &tuple,
+                    const std::string attrNames[],
+                    std::vector<std::string> &tags,
+                    int index )
+    {
+        std::stringstream ss;
+        ss << attrNames[index] << "=\"" << tuple.head << "\"";
+        tags.push_back( ss.str() );
+    }
+
+    template<typename T1, typename T2>
+    void renderTags(
+                    const boost::tuples::cons<T1, T2> &tuple,
+                    const std::string attrNames[],
+                    std::vector<std::string> &tags,
+                    int index )
+    {
+        std::stringstream ss;
+        ss << attrNames[index] << "=\"" << tuple.head << "\"";
+        tags.push_back( ss.str() );
+
+        renderTags( tuple.tail, attrNames, tags, index + 1 );
+    }
+
+    template<typename T1, typename T2>
+    void XMLWriter::startNode( const std::string &nodeName, const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple )
+    {
+        std::vector<std::string> tags;
+  
+        renderTags( attrValueTuple, attrNames, tags, 0 );
+
+        writeIndent();
+        m_outStream << "<" << nodeName << " " << boost::algorithm::join( tags, " " ) << ">" << std::endl;
+
+        indentLevel++;
+    }
+
+    void XMLWriter::endNode( const std::string &nodeName )
+    {
+        indentLevel--;
+        writeIndent();
+        m_outStream << "</" << nodeName << ">" << std::endl;
+    }
+
+    void map(std::ostream &out, // destination for output
+             Context &context,      // database connection settings, etc...
+             double minLat, double maxLat, double minLon, double maxLon ) // function specific parameters
+    {
+        DbConnection dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
+
+        std::string setup [] =
+        {
+            "CREATE TEMPORARY TABLE temp_node_ids    ( id BIGINT, PRIMARY KEY(id) )",
+            "CREATE TEMPORARY TABLE temp_way_ids     ( id BIGINT, PRIMARY KEY(id) )",
+            "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT, PRIMARY KEY(id) )",
+            boost::str( boost::format(
+                                      "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
+                                      "latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
+                        % minLat % maxLat % minLon % maxLon ),
+            "INSERT INTO temp_way_ids SELECT DISTINCT way_nodes.id FROM way_nodes INNER JOIN "
+            "temp_node_ids ON way_nodes.node_id=temp_node_ids.id",
+            "INSERT IGNORE INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
+            "INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id",
+            "INSERT INTO temp_relation_ids SELECT DISTINCT relation_members.id FROM "
+            "relation_members INNER JOIN temp_node_ids ON relation_members.member_id=temp_node_ids.id "
+            "WHERE member_type='node'",
+            "INSERT IGNORE INTO temp_relation_ids SELECT DISTINCT relation_members.id "
+            "FROM relation_members INNER JOIN temp_way_ids ON relation_members.member_id=temp_way_ids.id "
+            "WHERE member_type='way'",
+        };
+
+        BOOST_FOREACH (const std::string &command, setup)
+        {
+            dbConn.execute_noresult (command);
+        }
+
+        dbConn.execute( "SELECT COUNT(*) FROM temp_way_ids" );
+        std::cout << dbConn.getField<int>( 0 ) << std::endl;
+
+        dbConn.execute( "SELECT COUNT(*) FROM temp_node_ids" );
+        std::cout << dbConn.getField<int>( 0 ) << std::endl;
+
+        // Node attrs: id, lat, lon, user, visible, timestamp
+        // Node children: tags with tag attrs k, v (split of tag line on ; and then =)
+
+        // Way attrs: id, user, visible, timestamp
+        // Way children: nds with nd attr ref (node id)
+
+        dbConn.execute( "SELECT nodes.id, latitude, longitude, visible, timestamp, tags  FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
+        std::cout << "Writing out nodes" << std::endl;
+
+        out << xml::setformat (4, ' ');
+        out << xml::indent << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        out << xml::indent << "<osm version=\"0.5\" generator=\"modosmapi\">\n";
+        out << xml::inc;
+
+        do
+        {
+            const std::string nodeAttrNames[] = { "id", "lat", "lon", "visible", "timestamp" };
+            boost::tuple<
             boost::uint64_t,
             boost::int64_t,
             boost::int64_t,
             bool,
             std::string> nodeData;
 
-        dbConn.readRow( nodeData );
+            dbConn.readRow( nodeData );
 
-        std::string tagString = dbConn.getField<std::string>( 5 );
+            std::string tagString = dbConn.getField<std::string>( 5 );
 
-        std::vector<std::string> tags;
-        boost::algorithm::split( tags, tagString, boost::algorithm::is_any_of( ";" ) );
+            std::vector<std::string> tags;
+            boost::algorithm::split( tags, tagString, boost::algorithm::is_any_of( ";" ) );
 
-        out << xml::indent << "<node " << xml::attrs (nodeAttrNames, nodeData);
+            out << xml::indent << "<node " << xml::attrs (nodeAttrNames, nodeData);
 
-        if (tags.empty () || (tags.size () == 1 && tags.front ().empty ()))
-        {
-            out << "/>\n";
-        }
-        else
-        {
-            out << ">\n";
-            out << xml::inc;
-
-            BOOST_FOREACH( const std::string &tag, tags )
+            if (tags.empty () || (tags.size () == 1 && tags.front ().empty ()))
             {
-                if ( !tag.empty() )
+                out << "/>\n";
+            }
+            else
+            {
+                out << ">\n";
+                out << xml::inc;
+
+                BOOST_FOREACH( const std::string &tag, tags )
                 {
-                    // TODO: Be less Lazy
-                    std::vector<std::string> keyValue;
-                    boost::algorithm::split( keyValue, tag, boost::algorithm::is_any_of( "=" ) );
+                    if ( !tag.empty() )
+                    {
+                        // TODO: Be less Lazy
+                        std::vector<std::string> keyValue;
+                        boost::algorithm::split( keyValue, tag, boost::algorithm::is_any_of( "=" ) );
     
-                    if ( keyValue.size() != 2 )
-                    {
-                        std::cout << "Node tag is not an '=' delimited key-value pair: " << tag << " (" << tagString << ")" << std::endl;
-                    }
-                    else
-                    {
-                        const std::string tagAttrNames[] = { "k", "v" };
-                        out << xml::indent << "<tag " << xml::attrs (tagAttrNames, boost::make_tuple (keyValue[0], keyValue[1])) << "/>\n";
+                        if ( keyValue.size() != 2 )
+                        {
+                            std::cout << "Node tag is not an '=' delimited key-value pair: " << tag << " (" << tagString << ")" << std::endl;
+                        }
+                        else
+                        {
+                            const std::string tagAttrNames[] = { "k", "v" };
+                            out << xml::indent << "<tag " << xml::attrs (tagAttrNames, boost::make_tuple (keyValue[0], keyValue[1])) << "/>\n";
+                        }
                     }
                 }
+                out << xml::dec;
+                out << xml::indent << "</node>\n";
             }
+        }
+        while ( dbConn.next() );
+
+        // TODO: Use a nice sorted vector as for the way tags
+        typedef std::map<boost::uint64_t, std::vector<boost::uint64_t> > wayNodes_t;
+        wayNodes_t wayNodes;
+        dbConn.execute( "SELECT way_nodes.id, node_id FROM way_nodes INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id" );
+        do
+        {
+            boost::uint64_t wayId = dbConn.getField<boost::uint64_t>( 0 );
+            boost::uint64_t nodeId = dbConn.getField<boost::uint64_t>( 1 );
+
+            wayNodes[wayId].push_back( nodeId );
+        }
+        while ( dbConn.next() );
+
+        // TODO: Use a nice sorted vector as for the way tags
+        typedef boost::tuple<boost::uint64_t, std::string, std::string, std::string> relationTag_t;
+        typedef std::map<boost::uint64_t, std::vector<relationTag_t> > relationTags_t;
+        relationTags_t relationTags;
+        dbConn.execute( "SELECT relation_tags.id, k, v, version FROM relation_tags INNER JOIN temp_relation_ids "
+                        "ON relation_tags.id=temp_relation_ids.id" );
+        do
+        {
+            relationTag_t relationTag;
+            dbConn.readRow( relationTag );
+            relationTags[relationTag.get<0>()].push_back( relationTag );
+        }
+        while( dbConn.next() );
+
+        typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, std::string> relationMember_t;
+        typedef std::map<boost::uint64_t, std::vector<relationMember_t> > relationMembers_t;
+        relationMembers_t relationMembers;
+        dbConn.execute( "SELECT relation_members.id, member_type, member_id, member_role FROM relation_members INNER JOIN "
+                        "temp_relation_ids ON relation_members.id=temp_relation_ids.id" );
+        do
+        {
+            relationMember_t relationMember;
+            dbConn.readRow( relationMember );
+            relationMembers[relationMember.get<0>()].push_back( relationMember );
+        }
+        while ( dbConn.next() );
+
+        typedef boost::tuple<boost::uint64_t, bool, std::string, boost::uint64_t> relation_t;
+        const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
+        dbConn.execute( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
+                        "temp_relation_ids ON relations.id=temp_relation_ids.id" );
+
+        do
+        {
+            relation_t relation;
+            dbConn.readRow( relation );
+
+            out << xml::indent << "<relation " << xml::attrs (relationTagNames, relation) << ">\n";
+            out << xml::inc;
+        
+            relationTags_t::iterator rFindIt = relationTags.find( relation.get<0>() );
+            if ( rFindIt != relationTags.end() )
+            {
+                const std::string tagTagNames[] = { "k", "v" };
+                BOOST_FOREACH( const relationTag_t &theTag, rFindIt->second )
+                {
+                    std::string k = theTag.get<1>();
+                    std::string v = theTag.get<2>();
+
+                    out << xml::indent << "<tag " << xml::attrs (tagTagNames, boost::make_tuple (k, v)) << "/>\n";
+                }
+            }
+
+            relationMembers_t::iterator mFindIt = relationMembers.find( relation.get<0>() );
+            if ( mFindIt != relationMembers.end() )
+            {
+                const std::string memberTagNames[] = { "type", "ref", "role" };
+                BOOST_FOREACH( const relationMember_t &theMember, mFindIt->second )
+                {
+                    out << xml::indent << "<member " << xml::attrs (memberTagNames, theMember.tail) << "/>\n";
+                }
+            }
+
             out << xml::dec;
-            out << xml::indent << "</node>\n";
+            out << xml::indent << "</relation>\n";
         }
-    }
-    while ( dbConn.next() );
-
-    // TODO: Use a nice sorted vector as for the way tags
-    typedef std::map<boost::uint64_t, std::vector<boost::uint64_t> > wayNodes_t;
-    wayNodes_t wayNodes;
-    dbConn.execute( "SELECT way_nodes.id, node_id FROM way_nodes INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id" );
-    do
-    {
-        boost::uint64_t wayId = dbConn.getField<boost::uint64_t>( 0 );
-        boost::uint64_t nodeId = dbConn.getField<boost::uint64_t>( 1 );
-
-        wayNodes[wayId].push_back( nodeId );
-    }
-    while ( dbConn.next() );
-
-    // TODO: Use a nice sorted vector as for the way tags
-    typedef boost::tuple<boost::uint64_t, std::string, std::string, std::string> relationTag_t;
-    typedef std::map<boost::uint64_t, std::vector<relationTag_t> > relationTags_t;
-    relationTags_t relationTags;
-    dbConn.execute( "SELECT relation_tags.id, k, v, version FROM relation_tags INNER JOIN temp_relation_ids "
-                    "ON relation_tags.id=temp_relation_ids.id" );
-    do
-    {
-        relationTag_t relationTag;
-        dbConn.readRow( relationTag );
-        relationTags[relationTag.get<0>()].push_back( relationTag );
-    }
-    while( dbConn.next() );
-
-    typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, std::string> relationMember_t;
-    typedef std::map<boost::uint64_t, std::vector<relationMember_t> > relationMembers_t;
-    relationMembers_t relationMembers;
-    dbConn.execute( "SELECT relation_members.id, member_type, member_id, member_role FROM relation_members INNER JOIN "
-                    "temp_relation_ids ON relation_members.id=temp_relation_ids.id" );
-    do
-    {
-        relationMember_t relationMember;
-        dbConn.readRow( relationMember );
-        relationMembers[relationMember.get<0>()].push_back( relationMember );
-    }
-    while ( dbConn.next() );
-
-    typedef boost::tuple<boost::uint64_t, bool, std::string, boost::uint64_t> relation_t;
-    const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
-    dbConn.execute( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
-                    "temp_relation_ids ON relations.id=temp_relation_ids.id" );
-
-    do
-    {
-        relation_t relation;
-        dbConn.readRow( relation );
-
-        out << xml::indent << "<relation " << xml::attrs (relationTagNames, relation) << ">\n";
-        out << xml::inc;
+        while ( dbConn.next() );
         
-        relationTags_t::iterator rFindIt = relationTags.find( relation.get<0>() );
-        if ( rFindIt != relationTags.end() )
+        
+
+        std::vector<wayTag_t> wayTags;
+        dbConn.execute( "SELECT way_tags.id, k, v, version FROM way_tags INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id" );
+        do
         {
-            const std::string tagTagNames[] = { "k", "v" };
-            BOOST_FOREACH( const relationTag_t &theTag, rFindIt->second )
-            {
-                std::string k = theTag.get<1>();
-                std::string v = theTag.get<2>();
+            wayTag_t wayTag;
 
-                out << xml::indent << "<tag " << xml::attrs (tagTagNames, boost::make_tuple (k, v)) << "/>\n";
-            }
+            dbConn.readRow( wayTag );
+
+            wayTags.push_back( wayTag );
         }
+        while ( dbConn.next() );
 
-        relationMembers_t::iterator mFindIt = relationMembers.find( relation.get<0>() );
-        if ( mFindIt != relationMembers.end() )
-        {
-            const std::string memberTagNames[] = { "type", "ref", "role" };
-            BOOST_FOREACH( const relationMember_t &theMember, mFindIt->second )
-            {
-                out << xml::indent << "<member " << xml::attrs (memberTagNames, theMember.tail) << "/>\n";
-            }
-        }
+        std::sort( wayTags.begin(), wayTags.end(), WayTagLt() );
 
-        out << xml::dec;
-        out << xml::indent << "</relation>\n";
-    }
-    while ( dbConn.next() );
-        
-        
+        std::cout << "Number of way tags: " << wayTags.size() << std::endl;
 
-    std::vector<wayTag_t> wayTags;
-    dbConn.execute( "SELECT way_tags.id, k, v, version FROM way_tags INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id" );
-    do
-    {
-        wayTag_t wayTag;
+        // TODO: Look up the user name from user id
+        dbConn.execute( "SELECT ways.id, visible, timestamp, user_id FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id" );
 
-        dbConn.readRow( wayTag );
-
-        wayTags.push_back( wayTag );
-    }
-    while ( dbConn.next() );
-
-    std::sort( wayTags.begin(), wayTags.end(), WayTagLt() );
-
-    std::cout << "Number of way tags: " << wayTags.size() << std::endl;
-
-    // TODO: Look up the user name from user id
-    dbConn.execute( "SELECT ways.id, visible, timestamp, user_id FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id" );
-
-    do
-    { 
-       boost::tuple<
+        do
+        { 
+            boost::tuple<
             boost::uint64_t,
             bool,
             std::string,
             boost::uint64_t> wayData;
 
-        dbConn.readRow( wayData );
-        boost::uint64_t wayId = wayData.get<0>();
+            dbConn.readRow( wayData );
+            boost::uint64_t wayId = wayData.get<0>();
 
-        const std::string wayAttrNames[] = { "id", "visible", "timestamp", "user" };
+            const std::string wayAttrNames[] = { "id", "visible", "timestamp", "user" };
 
-        out << xml::indent << "<way " << xml::attrs (wayAttrNames, wayData) << ">\n";
-        out << xml::inc;
+            out << xml::indent << "<way " << xml::attrs (wayAttrNames, wayData) << ">\n";
+            out << xml::inc;
 
-        wayNodes_t::iterator findIt = wayNodes.find( wayId );
-        if ( findIt != wayNodes.end() )
-        {
-            BOOST_FOREACH( boost::uint64_t nodeId, findIt->second )
+            wayNodes_t::iterator findIt = wayNodes.find( wayId );
+            if ( findIt != wayNodes.end() )
             {
-                out << xml::indent << "<nd ref=" << xml::quoteattr (nodeId) << "/>\n";
+                BOOST_FOREACH( boost::uint64_t nodeId, findIt->second )
+                {
+                    out << xml::indent << "<nd ref=" << xml::quoteattr (nodeId) << "/>\n";
+                } 
             } 
-        } 
 
-        wayTagRange_t tags = std::equal_range( wayTags.begin(), wayTags.end(), wayId, WayTagLt() );
+            wayTagRange_t tags = std::equal_range( wayTags.begin(), wayTags.end(), wayId, WayTagLt() );
 
-        for ( ; tags.first != tags.second; ++tags.first )
-        {
-            const std::string tagAttrNames[] = { "k", "v", "version" };
-            out << xml::indent << "<tag " << xml::attrs (tagAttrNames, (*tags.first).tail) << "/>\n";
-        }
+            for ( ; tags.first != tags.second; ++tags.first )
+            {
+                const std::string tagAttrNames[] = { "k", "v", "version" };
+                out << xml::indent << "<tag " << xml::attrs (tagAttrNames, (*tags.first).tail) << "/>\n";
+            }
         
+            out << xml::dec;
+            out << xml::indent << "</way>\n";
+        }
+        while ( dbConn.next() );
+
         out << xml::dec;
-        out << xml::indent << "</way>\n";
-    }
-    while ( dbConn.next() );
+        out << xml::indent << "</osm>\n";
 
-    out << xml::dec;
-    out << xml::indent << "</osm>\n";
-
-    dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
-    dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
-    dbConn.execute_noresult( "DROP TABLE temp_relation_ids" );
+        dbConn.execute_noresult( "DROP TABLE temp_way_ids" );
+        dbConn.execute_noresult( "DROP TABLE temp_node_ids" );
+        dbConn.execute_noresult( "DROP TABLE temp_relation_ids" );
     
 
-    // Similarly: SELECT ways.* FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id
-    //            SELECT way_nodes.* FROM way_nodes INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id
-    //            (and way_tags and relations)
-}
+        // Similarly: SELECT ways.* FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id
+        //            SELECT way_nodes.* FROM way_nodes INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id
+        //            (and way_tags and relations)
+    }
 
-} // end namespace modosm
+} // end namespace modosmapi
 
 int main( int argc, char *argv [] )
 {
@@ -684,10 +433,10 @@ int main( int argc, char *argv [] )
         double maxLon = -9000000;
 
         std::ofstream opFile( "test_result.txt" );
-        modosm::Context c;
-        modosm::map(opFile, c, minLat, maxLat, minLon, maxLon );
+        modosmapi::Context c;
+        modosmapi::map(opFile, c, minLat, maxLat, minLon, maxLon );
     }
-    catch ( const modosm::SqlException &e )
+    catch ( const modosmapi::SqlException &e )
     {
         std::cout << "SQL exception thrown: " << e.getMessage() << std::endl;
         return -1;
