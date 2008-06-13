@@ -1,5 +1,5 @@
-#include "engine.h"
-#include "ioxml.h"
+#include "engine.hpp"
+#include "ioxml.hpp"
 #include "dbhandler.hpp"
 
 #include <iostream>

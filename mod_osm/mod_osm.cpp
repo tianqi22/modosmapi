@@ -21,7 +21,7 @@
 
 #include <mysql/mysql.h>
 
-#include "engine.h"
+#include "engine.hpp"
 
 struct Sink
 {
