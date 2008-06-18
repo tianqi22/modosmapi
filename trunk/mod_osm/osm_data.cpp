@@ -3,17 +3,31 @@
 #include <boost/bind.hpp>
 #include <boost/format.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/foreach.hpp>
 
 #include "osm_data.hpp"
 #include "xml_reader.hpp"
 
+const static double minLat = -180.0;
+const static double maxLat = +180.0;
+const static double minLon = -90.0;
+const static double maxLon = +90.0;
 
-OSMNode::OSMNode( OSMFragment &frag, XMLNodeData &data )
+
+// Cache tile filenames of form tile_<lat>_<lon>.cache
+// If modified in memory - need to rewrite the whole
+//
+// Put ways (and tags) in tile of first member node
+// Put relations (and member lists) in tile of first member (node or way)
+
+// Do we need a single cache map of node locations? Perhaps...
+
+const static size_t cacheTileDivisions = 128;
+
+void OSMBase::readBaseData( OSMFragment &frag, XMLNodeData &data )
 {
     data.readAttributes()
         ( "id", m_id )
-        ( "lat", m_lat )
-        ( "lon", m_lon )
         ( "timestamp", m_timestamp )
         ( "user", m_user, true, std::string( "none" ) )
         ( "uid", m_userId, true, dbId_t( 0 ) );
@@ -22,7 +36,16 @@ OSMNode::OSMNode( OSMFragment &frag, XMLNodeData &data )
     {
         frag.addUser( m_userId, m_user );
     }
-        
+
+}
+
+OSMNode::OSMNode( OSMFragment &frag, XMLNodeData &data )
+{
+    readBaseData( frag, data );
+
+    data.readAttributes()
+        ( "lat", m_lat )
+        ( "lon", m_lon );
 
     data.registerMembers()("tag", boost::bind( &OSMNode::readTag, this, _1 ) );
 }
@@ -35,19 +58,13 @@ void OSMNode::readTag( XMLNodeData &data )
     m_tags.insert( tag_t( k, v ) );
 }
 
+
 OSMWay::OSMWay( OSMFragment &frag, XMLNodeData &data )
 {
-    data.readAttributes()
-        ( "id", m_id )
-        ( "timestamp", m_timestamp )
-        //( "visible", m_visible )
-        ( "user", m_user, true, std::string( "none" ) )
-        ( "uid", m_userId, true, dbId_t( 0 ) );
+    readBaseData( frag, data );
 
-    if ( m_user != "none" && m_userId != 0 )
-    {
-        frag.addUser( m_userId, m_user );
-    }
+    data.readAttributes()
+        ( "visible", m_visible, true, true );
 
     data.registerMembers()
         ( "nd", boost::bind( &OSMWay::readNd, this, _1 ) )
@@ -65,21 +82,13 @@ void OSMWay::readNd( XMLNodeData &data )
 {
     dbId_t ndId;
     data.readAttributes()( "ref", ndId );
-    m_nodes.push_back( ndId );
+    m_nodes.insert( ndId );
 }
+
 
 OSMRelation::OSMRelation( OSMFragment &frag, XMLNodeData &data )
 {
-    data.readAttributes()
-        ( "id", m_id )
-        ( "timestamp", m_timestamp )
-        ( "user", m_user, true, std::string( "none" ) )
-        ( "uid", m_userId, true, dbId_t( 0 ) );
-
-    if ( m_user != "none" && m_userId != 0 )
-    {
-        frag.addUser( m_userId, m_user );
-    }
+    readBaseData( frag, data );
 
     data.registerMembers()
         ( "member", boost::bind( &OSMRelation::readMember, this, _1 ) )
@@ -93,7 +102,7 @@ void OSMRelation::readMember( XMLNodeData &data )
         ( "type", theMember.get<0>() )
         ( "ref", theMember.get<1>() )
         ( "role", theMember.get<2>() );
-    m_members.push_back( theMember );
+    m_members.insert( theMember );
 }
 
 void OSMRelation::readTag( XMLNodeData &data )
@@ -104,7 +113,6 @@ void OSMRelation::readTag( XMLNodeData &data )
         ( "v", theTag.second );
     m_tags.insert( theTag );
 }
-
 
 void OSMFragment::build( XMLNodeData &data )
 {
@@ -144,4 +152,19 @@ void OSMFragment::addUser( dbId_t userId, const std::string &userName )
     }
 }
 
+
+
+
+/* Filling the db...
+
+* "INSERT INTO nodes (id,latitude,longitude,user_id,visible,tags,timestamp,tile) VALUES (?,ROUND(?*10000000),ROUND(?*10000000),?,1,?,?,tile_for_point(CAST(ROUND(?*10000000) AS UNSIGNED),CAST(ROUND(?*10000000) AS UNSIGNED)))"
+* "INSERT INTO ways (id,user_id,timestamp,version,visible) VALUES (?,?,?,1,1)"
+* "INSERT INTO way_tags (id,k,v,version) VALUES (?,?,?,1)";
+* "INSERT INTO relations (id,user_id,timestamp,version,visible) VALUES (?,?,?,1,1)"
+* "INSERT INTO relation_tags (id,k,v,version) VALUES (?,?,?,1)"
+* "INSERT INTO relation_members (id,member_type,member_id,member_role,version) VALUES (?,?,?,?,1)"
+* 
+
+
+*/
 

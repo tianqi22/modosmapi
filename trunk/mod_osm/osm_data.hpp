@@ -4,10 +4,12 @@
 #include <string>
 #include <deque>
 #include <map>
+#include <set>
 #include <vector>
 
 #include <boost/cstdint.hpp>
 #include <boost/tuple/tuple.hpp>
+#include <boost/tuple/tuple_comparison.hpp>
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
@@ -16,44 +18,88 @@ typedef boost::uint64_t dbId_t;
 typedef std::string string_t;
 typedef std::pair<std::string, std::string> tag_t;
 typedef std::map<std::string, std::string> tagMap_t;
-typedef boost::tuple<string_t, string_t, string_t> member_t;
+typedef boost::tuple<string_t, dbId_t, string_t> member_t;
 
 #include "xml_reader.hpp"
+#include "../testing/equality_tester.hpp"
 
+class ConstTagString
+{
+private:
+    typedef std::map<std::string, size_t> stringMap_t;
+    static stringMap_t m_stringToMap;
+    static size_t m_lastIndex;
+    
+    size_t m_stringIndex;
+
+public:
+    ConstTagString( const std::string &str )
+    {
+        assignString( str );
+    }
+
+    void assignString( const std::string &str )
+    {
+        stringMap_t::iterator findIt = m_stringMap.find( str );
+
+        if ( findIt == m_stringMap.end() )
+        {
+            m_stringIndex = m_lastIndex++;
+            m_stringMap.insert( std::make_pair( str, m_stringIndex ) );            
+        }
+        else
+        {
+            m_stringIndex = findIt->second;
+        }
+    }
+};
+
+stringMap_t ConstTagString::m_stringToMap;
+size_t ConstTagString::m_lastIndex = 0;
 
 class OSMFragment;
 
-class OSMNode
+class OSMBase
+{
+protected:
+    dbId_t   m_id;
+    string_t m_timestamp;
+    string_t m_user;
+    dbId_t   m_userId;
+
+    void readBaseData( OSMFragment &frag, XMLNodeData &data );
+
+public:
+    dbId_t getId() const { return m_id; }
+    const string_t &getTimeStamp() const { return m_timestamp; }
+    const string_t &getUser() const { return m_user; }
+    dbId_t getUserId() const { return m_userId; }
+};
+
+class OSMNode : public OSMBase
 {
 private:
-    dbId_t             m_id;
     double             m_lat;
     double             m_lon;
-    string_t           m_timestamp;
-    string_t           m_user;
-    dbId_t             m_userId;
 
     tagMap_t           m_tags;
 
 public:
     OSMNode( OSMFragment &frag, XMLNodeData &data );
 
-    void   readTag( XMLNodeData &data );
+    void readTag( XMLNodeData &data );
 
-    dbId_t getId() const { return m_id; }
+    double getLat() const { return m_lat; }
+    double getLon() const { return m_lon; }
     const tagMap_t &getTags() const { return m_tags; }
 };
 
-class OSMWay
+class OSMWay : public OSMBase
 {
 private:
-    dbId_t               m_id;
     bool               m_visible;
-    string_t           m_timestamp;
-    string_t           m_user;
-    dbId_t               m_userId;
 
-    std::vector<dbId_t>  m_nodes;
+    std::set<dbId_t>  m_nodes;
     tagMap_t           m_tags;
 
 public:
@@ -61,34 +107,26 @@ public:
     void readTag( XMLNodeData &data );
     void readNd( XMLNodeData &data );
 
-    dbId_t getId() const { return m_id; }
     bool getVisible() const { return m_visible; }
-    const string_t &getTimeStamp() { return m_timestamp; }
-    const string_t &getUser() { return m_user; }
 
-    const std::vector<dbId_t> &getNodes() const { return m_nodes; }
+    const std::set<dbId_t> &getNodes() const { return m_nodes; }
     const tagMap_t &getTags() const { return m_tags; }
 };
 
-class OSMRelation
+
+class OSMRelation : public OSMBase
 {
 private:
-    dbId_t   m_id;
-    string_t m_timestamp;
-    string_t m_user;
-    dbId_t   m_userId;
-
     tagMap_t m_tags;
-    std::vector<member_t> m_members;
+    std::set<member_t> m_members;
 
 public:
     OSMRelation( OSMFragment &frag, XMLNodeData &data );
     void readMember( XMLNodeData &data );
     void readTag( XMLNodeData &data );
 
-    dbId_t getId() const { return m_id; }
     const tagMap_t &getTags() const { return m_tags; }
-    const std::vector<member_t> &getMembers() const { return m_members; }
+    const std::set<member_t> &getMembers() const { return m_members; }
 };
 
 class OSMFragment
