@@ -23,6 +23,7 @@ typedef boost::tuple<string_t, dbId_t, string_t> member_t;
 #include "xml_reader.hpp"
 #include "../testing/equality_tester.hpp"
 
+#if 0
 class ConstTagString
 {
 private:
@@ -56,6 +57,7 @@ public:
 
 stringMap_t ConstTagString::m_stringToMap;
 size_t ConstTagString::m_lastIndex = 0;
+#endif
 
 class OSMFragment;
 
@@ -99,7 +101,7 @@ class OSMWay : public OSMBase
 private:
     bool               m_visible;
 
-    std::set<dbId_t>  m_nodes;
+    std::set<dbId_t>   m_nodes;
     tagMap_t           m_tags;
 
 public:
