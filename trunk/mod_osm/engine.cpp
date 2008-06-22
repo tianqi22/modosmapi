@@ -164,10 +164,17 @@ namespace modosmapi
     }
 
     void map(std::ostream &out, // destination for output
-             Context &context,      // database connection settings, etc...
+             Context &context,  // database connection settings, etc...
              double minLat, double maxLat, double minLon, double maxLon ) // function specific parameters
     {
         DbConnection dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" );
+
+        boost::int64_t minLatInt = (minLat * 10000000.0);
+        boost::int64_t maxLatInt = (maxLat * 10000000.0);
+        boost::int64_t minLonInt = (minLon * 10000000.0);
+        boost::int64_t maxLonInt = (maxLon * 10000000.0);
+
+        out << minLatInt << ", " << maxLatInt << ", " << minLonInt << ", " << maxLonInt;
 
         std::string setup [] =
         {
@@ -175,9 +182,9 @@ namespace modosmapi
             "CREATE TEMPORARY TABLE temp_way_ids     ( id BIGINT, PRIMARY KEY(id) )",
             "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT, PRIMARY KEY(id) )",
             boost::str( boost::format(
-                                      "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
-                                      "latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
-                        % minLat % maxLat % minLon % maxLon ),
+                "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
+                "latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
+                    % minLatInt % maxLatInt % minLonInt % maxLonInt ),
             "INSERT INTO temp_way_ids SELECT DISTINCT way_nodes.id FROM way_nodes INNER JOIN "
             "temp_node_ids ON way_nodes.node_id=temp_node_ids.id",
             "INSERT IGNORE INTO temp_node_ids SELECT DISTINCT way_nodes.node_id FROM way_nodes "
@@ -195,40 +202,32 @@ namespace modosmapi
             dbConn.executeNoResult (command);
         }
 
-        dbConn.execute( "SELECT COUNT(*) FROM temp_way_ids" );
-        std::cout << dbConn.getField<int>( 0 ) << std::endl;
-
-        dbConn.execute( "SELECT COUNT(*) FROM temp_node_ids" );
-        std::cout << dbConn.getField<int>( 0 ) << std::endl;
-
         // Node attrs: id, lat, lon, user, visible, timestamp
         // Node children: tags with tag attrs k, v (split of tag line on ; and then =)
 
         // Way attrs: id, user, visible, timestamp
         // Way children: nds with nd attr ref (node id)
 
-        dbConn.execute( "SELECT nodes.id, latitude, longitude, visible, timestamp, tags  FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
-        std::cout << "Writing out nodes" << std::endl;
+        dbConn.execute( "SELECT nodes.id, latitude, longitude, visible, timestamp, tags FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
 
         out << xml::setformat (4, ' ');
         out << xml::indent << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
         out << xml::indent << "<osm version=\"0.5\" generator=\"modosmapi\">\n";
         out << xml::inc;
 
-        do
+        while ( dbConn.next() )
         {
             const std::string nodeAttrNames[] = { "id", "lat", "lon", "visible", "timestamp" };
             boost::tuple<
-            boost::uint64_t,
-            boost::int64_t,
-            boost::int64_t,
-            bool,
-            std::string> nodeData;
+                boost::uint64_t,
+                boost::int64_t,
+                boost::int64_t,
+                bool,
+                std::string> nodeData;
 
             dbConn.readRow( nodeData );
 
             std::string tagString = dbConn.getField<std::string>( 5 );
-
             std::vector<std::string> tags;
             boost::algorithm::split( tags, tagString, boost::algorithm::is_any_of( ";" ) );
 
@@ -266,54 +265,59 @@ namespace modosmapi
                 out << xml::indent << "</node>\n";
             }
         }
-        while ( dbConn.next() );
+
 
         // TODO: Use a nice sorted vector as for the way tags
         typedef std::map<boost::uint64_t, std::vector<boost::uint64_t> > wayNodes_t;
         wayNodes_t wayNodes;
         dbConn.execute( "SELECT way_nodes.id, node_id FROM way_nodes INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id" );
-        do
+        while ( dbConn.next() )
         {
             boost::uint64_t wayId = dbConn.getField<boost::uint64_t>( 0 );
             boost::uint64_t nodeId = dbConn.getField<boost::uint64_t>( 1 );
 
             wayNodes[wayId].push_back( nodeId );
         }
-        while ( dbConn.next() );
 
+        out << "Here2";
         // TODO: Use a nice sorted vector as for the way tags
         typedef boost::tuple<boost::uint64_t, std::string, std::string, std::string> relationTag_t;
         typedef std::map<boost::uint64_t, std::vector<relationTag_t> > relationTags_t;
         relationTags_t relationTags;
         dbConn.execute( "SELECT relation_tags.id, k, v, version FROM relation_tags INNER JOIN temp_relation_ids "
                         "ON relation_tags.id=temp_relation_ids.id" );
-        do
+
+
+        while( dbConn.next() )
         {
             relationTag_t relationTag;
             dbConn.readRow( relationTag );
             relationTags[relationTag.get<0>()].push_back( relationTag );
         }
-        while( dbConn.next() );
-
+        
+        out << "Here4";
         typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, std::string> relationMember_t;
         typedef std::map<boost::uint64_t, std::vector<relationMember_t> > relationMembers_t;
         relationMembers_t relationMembers;
         dbConn.execute( "SELECT relation_members.id, member_type, member_id, member_role FROM relation_members INNER JOIN "
                         "temp_relation_ids ON relation_members.id=temp_relation_ids.id" );
-        do
+
+
+        while ( dbConn.next() )
         {
             relationMember_t relationMember;
             dbConn.readRow( relationMember );
             relationMembers[relationMember.get<0>()].push_back( relationMember );
         }
-        while ( dbConn.next() );
+        
 
         typedef boost::tuple<boost::uint64_t, bool, std::string, boost::uint64_t> relation_t;
         const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
         dbConn.execute( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
                         "temp_relation_ids ON relations.id=temp_relation_ids.id" );
 
-        do
+
+        while ( dbConn.next() )
         {
             relation_t relation;
             dbConn.readRow( relation );
@@ -347,13 +351,10 @@ namespace modosmapi
             out << xml::dec;
             out << xml::indent << "</relation>\n";
         }
-        while ( dbConn.next() );
-        
-        
 
         std::vector<wayTag_t> wayTags;
         dbConn.execute( "SELECT way_tags.id, k, v, version FROM way_tags INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id" );
-        do
+        while ( dbConn.next() )
         {
             wayTag_t wayTag;
 
@@ -361,16 +362,13 @@ namespace modosmapi
 
             wayTags.push_back( wayTag );
         }
-        while ( dbConn.next() );
 
         std::sort( wayTags.begin(), wayTags.end(), WayTagLt() );
-
-        std::cout << "Number of way tags: " << wayTags.size() << std::endl;
 
         // TODO: Look up the user name from user id
         dbConn.execute( "SELECT ways.id, visible, timestamp, user_id FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id" );
 
-        do
+        while ( dbConn.next() )
         { 
             boost::tuple<
             boost::uint64_t,
@@ -406,7 +404,7 @@ namespace modosmapi
             out << xml::dec;
             out << xml::indent << "</way>\n";
         }
-        while ( dbConn.next() );
+
 
         out << xml::dec;
         out << xml::indent << "</osm>\n";

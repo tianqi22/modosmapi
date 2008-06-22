@@ -62,8 +62,6 @@ namespace modosmapi
         {
             throw SqlException( std::string( "Result store failed: " ) + mysql_error( &m_dbconn ) );
         }
-
-        next();
     }
 
     bool DbConnection::next()
