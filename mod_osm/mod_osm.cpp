@@ -19,6 +19,7 @@
 #include <boost/format.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/foreach.hpp>
 #include <boost/function.hpp>
 #include <boost/assign/list_inserter.hpp>
@@ -29,6 +30,24 @@ using namespace boost::assign;
 
 #include "engine.hpp"
 
+class ModuleException
+{
+private:
+    // TODO: Yes yes - I know this shoudn't use a std::string
+    // because its methods might throw. But I'm feeling lazy...
+    std::string m_message;
+
+public:
+    ModuleException( const std::string message ) : m_message( message )
+    {
+    }
+
+    const std::string &getMessage() const
+    {
+        return m_message;
+    }
+};
+
 struct ApachePageWriteSink
 {
     typedef char char_type;
@@ -36,7 +55,7 @@ struct ApachePageWriteSink
     ApachePageWriteSink (request_rec *r) : m_r (r) {}
     std::streamsize write (const char *s, std::streamsize n)
     {
-        // ensure s is NUL terminated
+        // ensure s is NULL terminated
         std::string str (s, n);
         ap_rputs (str.c_str (), m_r);
         return n;
@@ -54,15 +73,19 @@ typedef std::map<std::string, std::string> queryComponents_t;
 int notYetSupported( apacheStream_t &as, const pathComponents_t &pathComponents, const queryComponents_t &queryKVPairs );
 int mapQuery( apacheStream_t &as, const pathComponents_t &pathComponents, const queryComponents_t &queryKVPairs );
 
-static int runQuery( apacheStream_t &as, const std::vector<std::string> &pathComponents, const std::map<std::string, std::string> &queryKVPairs )
-{
-    // ASSERT( pathComponents.size() > 2 );
-    // ASSERT( pathComponents[0] == 'api' );
-        
-    std::string apiVersion = pathComponents[1];
-    // ASSERT( apiVersion == '0.5' );
 
-    std::string queryType = pathComponents[2];
+void modAssert( bool predicate, std::string message )
+{
+    if ( !predicate )
+    {
+        throw ModuleException( boost::str( boost::format( "Module failed: %s" ) % message ) );
+    }
+}
+
+int runQuery( apacheStream_t &as, const std::vector<std::string> &pathComponents, const std::map<std::string, std::string> &queryKVPairs )
+{        
+    std::string apiVersion = pathComponents[2];
+    std::string queryType  = pathComponents[3];
 
 
     typedef boost::function<int(apacheStream_t &, const std::vector<std::string> &, const std::map<std::string, std::string> &)> queryFun_t;
@@ -99,10 +122,7 @@ static int runQuery( apacheStream_t &as, const std::vector<std::string> &pathCom
         ( "user",        &notYetSupported );
 
     std::map<std::string, queryFun_t>::const_iterator findIt = queryFnMap.find( queryType );
-    if ( findIt == queryFnMap.end() )
-    {
-        // TODO: fail
-    }
+    modAssert( findIt != queryFnMap.end(), "Function not found in query map" );
 
     return findIt->second( as, pathComponents, queryKVPairs );
 }
@@ -115,44 +135,39 @@ int notYetSupported( apacheStream_t &as, const std::vector<std::string> &pathCom
 
 int mapQuery( apacheStream_t &as, const std::vector<std::string> &pathComponents, const std::map<std::string, std::string> &queryKVPairs )
 {
-    // TODO: Assert that the bbox param exists
+    modAssert( queryKVPairs.find("bbox") != queryKVPairs.end(), "Map query expects bbox parameter" );
     const std::string &target = queryKVPairs.find("bbox")->second;
 
     std::vector<std::string> args;
     boost::algorithm::split (args, target, boost::algorithm::is_any_of (","));
 
+    modAssert( args.size() == 4, "Map bbox parameter must have four components" );
+
     std::vector<double> params;
     BOOST_FOREACH (const std::string &value, args)
     {
-        params.push_back (boost::lexical_cast<double> (value));
-    }
-
-    if (params.size () != 4)
-    {
-        // TODO: fail
+        try
+        {
+            params.push_back (boost::lexical_cast<double> (value));
+        }
+        catch ( boost::bad_lexical_cast & )
+        {
+            modAssert( false, "Bbox parameters must be of floating point type" );
+        }
     }
 
     as << "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\">\n";
 
-    //
-    // Run the query
-    //
     try
     {
         modosmapi::Context c;
-        modosmapi::map (as, c, params [0], params [1], params [2], params [3]);
+        modosmapi::map (as, c, params[1], params[3], params[0], params[2]);
     }
     catch (...)
     {
-        // TODO: fail 
+        modAssert( false, "Map query code failed - threw an exception" );
     }
 
-    //test (as);
-    /*
-      as << "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\">\n";
-      as << "<html><head><title>How surprising!</title></head>";
-      as << "<body><h1>Wow 2!</h1></body></html>";
-    */
     return OK;
 }
 
@@ -167,33 +182,66 @@ extern "C"
     
         if (r->method_number != M_GET)
             return HTTP_METHOD_NOT_ALLOWED;
-    
-        // Split the path into components
-        std::vector<std::string> pathComponents;
-        boost::algorithm::split( pathComponents, r->parsed_uri.path, boost::algorithm::is_any_of ("/"));
-        
-        // Split the query string into components
-        std::map<std::string, std::string> queryKVPairs;
-        {
-            std::vector<std::string> temp;
-            boost::algorithm::split( temp, r->parsed_uri.query, boost::algorithm::is_any_of ("&"));
-
-            BOOST_FOREACH( const std::string &kvPair, temp )
-            {
-                std::vector<std::string> kvTemp;
-                boost::algorithm::split( kvTemp, kvPair, boost::algorithm::is_any_of ("="));
-
-                // ASSERT( kvTemp.size() == 2 );
-                queryKVPairs[kvTemp[0]] = kvTemp[1];
-            }
-        }
 
         ap_set_content_type(r, "text/html;charset=ascii");
-
+       
         apacheStream_t as;
         as.open( ApachePageWriteSink( r ) );
+
+        try
+        {
+            // Split the path into components
+            std::vector<std::string> pathComponents;
+            if ( r->parsed_uri.path )
+            {
+                // Skip leading '/'
+                std::string path = r->parsed_uri.path + 1;
+                boost::algorithm::split( pathComponents, path, boost::algorithm::is_any_of ("/"));
+            }
+
+            modAssert( pathComponents.size() >= 4, "Path components less than 4" );
+            modAssert( pathComponents[0] == "osm" &&
+                       pathComponents[1] == "api" &&
+                       pathComponents[2] == "0.5",
+                       boost::str( boost::format( "Path should start /osm/api/0.5 (%s, %s, %s)" )
+                                   % pathComponents[0]
+                                   % pathComponents[1]
+                                   % pathComponents[2] ) );
+
         
-        return runQuery( as, pathComponents, queryKVPairs );
+            // Split the query string into components
+            std::map<std::string, std::string> queryKVPairs;
+            if ( r->parsed_uri.query )
+            {
+                std::vector<std::string> temp;
+                boost::algorithm::split( temp, r->parsed_uri.query, boost::algorithm::is_any_of ("&"));
+
+                BOOST_FOREACH( const std::string &kvPair, temp )
+                {
+                    std::vector<std::string> kvTemp;
+                    boost::algorithm::split( kvTemp, kvPair, boost::algorithm::is_any_of ("="));
+                    // ASSERT( kvTemp.size() == 2 );
+                    if ( kvTemp.size() == 2 )
+                    {
+                        queryKVPairs[kvTemp[0]] = kvTemp[1];
+                    }
+                }
+            }
+
+            return runQuery( as, pathComponents, queryKVPairs );
+        }
+        catch ( const ModuleException &m )
+        {
+            as << m.getMessage();
+
+            return OK;
+        }
+        catch ( const std::exception &e )
+        {
+            as << "Unidentified std::exception thrown";
+            
+            return OK;
+        }
     }
 
     static void register_hooks(apr_pool_t* pool)
