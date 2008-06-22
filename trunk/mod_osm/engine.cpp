@@ -174,13 +174,11 @@ namespace modosmapi
         boost::int64_t minLonInt = (minLon * 10000000.0);
         boost::int64_t maxLonInt = (maxLon * 10000000.0);
 
-        out << minLatInt << ", " << maxLatInt << ", " << minLonInt << ", " << maxLonInt;
-
         std::string setup [] =
         {
-            "CREATE TEMPORARY TABLE temp_node_ids    ( id BIGINT, PRIMARY KEY(id) )",
-            "CREATE TEMPORARY TABLE temp_way_ids     ( id BIGINT, PRIMARY KEY(id) )",
-            "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT, PRIMARY KEY(id) )",
+            "CREATE TEMPORARY TABLE temp_node_ids    ( id BIGINT )",
+            "CREATE TEMPORARY TABLE temp_way_ids     ( id BIGINT )",
+            "CREATE TEMPORARY TABLE temp_relation_ids( id BIGINT )",
             boost::str( boost::format(
                 "INSERT INTO temp_node_ids SELECT id FROM nodes WHERE "
                 "latitude > %f AND latitude < %f AND longitude > %f AND longitude < %f" )
@@ -208,7 +206,7 @@ namespace modosmapi
         // Way attrs: id, user, visible, timestamp
         // Way children: nds with nd attr ref (node id)
 
-        dbConn.execute( "SELECT nodes.id, latitude, longitude, visible, timestamp, tags FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
+        dbConn.execute( "SELECT nodes.id, latitude/10000000, longitude/10000000, visible, timestamp, tags FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
 
         out << xml::setformat (4, ' ');
         out << xml::indent << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -220,8 +218,8 @@ namespace modosmapi
             const std::string nodeAttrNames[] = { "id", "lat", "lon", "visible", "timestamp" };
             boost::tuple<
                 boost::uint64_t,
-                boost::int64_t,
-                boost::int64_t,
+                double,
+                double,
                 bool,
                 std::string> nodeData;
 

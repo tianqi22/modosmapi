@@ -17,10 +17,9 @@ def writeFile( filename, url ):
     print 'Fetch time:', (end-start)
 
 wolvercotebbox = ( -1.3163, 51.7574, -1.2684, 51.7782 )
-hhbbox = ( -0.5092, 51.7387, -0.4132, 51.7803 )
+#hhbbox = ( -0.5092, 51.7387, -0.4132, 51.7803 )
 
-#hhbbox = ( -1.3163, 51.7387, -0.4132, 51.7803 )
-
+hhbbox = ( -1.3163, 51.7387, -0.4132, 51.7803 )
 
 url = 'http://localhost/osm/api/0.5/map?bbox=%f,%f,%f,%f' % hhbbox
 writeFile( 'file1.xml', url )

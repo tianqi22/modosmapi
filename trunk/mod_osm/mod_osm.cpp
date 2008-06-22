@@ -156,8 +156,6 @@ int mapQuery( apacheStream_t &as, const std::vector<std::string> &pathComponents
         }
     }
 
-    as << "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\">\n";
-
     try
     {
         modosmapi::Context c;
