@@ -3,7 +3,9 @@
 
 
 namespace modosmapi
-{   
+{
+
+   
     template<typename T>
     T DbConnection::getField( size_t index )
     {
@@ -20,20 +22,6 @@ namespace modosmapi
     }
 
 
-    template<typename B, typename T1, typename T2>
-    void DbConnection::bindArgsRec( B &args, const boost::tuples::cons<T1, T2> &row, int offset )
-    { 
-        bindArg( args[offset], row.head );
-        bindArgsRec( args, row.tail, offset+1 );
-    }
-
-    template<typename B, typename T>
-    void DbConnection::bindArgsRec( B &args, const boost::tuples::cons<T, boost::tuples::null_type> &row, int offset )
-    {
-        bindArg( args[offset], row.head );
-    }
-
-
     template<typename T1, typename T2>
     void DbConnection::readRow( boost::tuples::cons<T1, T2> &t, size_t index )
     {
@@ -45,6 +33,41 @@ namespace modosmapi
     void DbConnection::readRow( boost::tuples::cons<T, boost::tuples::null_type> &t, size_t index )
     {
         t.head = getField<T>( index );
+    }
+
+    template<typename T>
+    void DbConnection::executeBulkRetrieve( std::string query, std::vector<T> &result )
+    {
+        cleanUp();
+
+        MYSQL_STMT *ps = mysql_stmt_init( &m_dbconn );
+        if ( !ps )
+        {
+            throw SqlException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
+        }
+
+        if ( mysql_stmt_prepare( ps, query.c_str(), query.size() ) )
+        {
+            throw SqlException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
+        }
+
+        if ( mysql_stmt_execute( ps ) )
+        {
+            throw SqlException( "Query execution failed" );
+        }
+
+        BindArgDataHolder dh( ps );
+
+        T row;
+        dh.init( row );
+
+        std::cout << "Fetch init" << std::endl;
+        while ( !mysql_stmt_fetch( ps ) )
+        {
+            std::cout << "Row fetch" << std::endl;
+            dh.getArgs( row );
+            result.push_back( row );
+        }
     }
 
     template<typename T>
@@ -63,18 +86,14 @@ namespace modosmapi
             throw SqlException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
         }
 
-        MYSQL_BIND args[boost::tuples::length<T>::value];
+
+        BindArgDataHolder dh( ps );
+        T temp;
+        dh.init( temp );
 
         BOOST_FOREACH( const T &row, rows )
         {
-            memset( args, 0, sizeof( args ) );
-
-            bindArgsRec( args, row, 0 );
-
-            if ( mysql_stmt_bind_param( ps, args ) )
-            {
-                throw SqlException( std::string( "Param binding failed: " ) + mysql_error( &m_dbconn ) );
-            }
+            dh.setArgs( row );
 
             if ( mysql_stmt_execute( ps ) )
             {
