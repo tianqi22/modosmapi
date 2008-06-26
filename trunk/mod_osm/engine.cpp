@@ -144,7 +144,10 @@ namespace modosmapi
     }
 
     template<typename T1, typename T2>
-    void XMLWriter::startNode( const std::string &nodeName, const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple )
+    void XMLWriter::startNode(
+        const std::string &nodeName,
+        const std::string attrNames[],
+        const boost::tuples::cons<T1, T2> &attrValueTuple )
     {
         std::vector<std::string> tags;
   
@@ -195,10 +198,13 @@ namespace modosmapi
             "WHERE member_type='way'",
         };
 
+        context.logTime( "Pre setup" );
         BOOST_FOREACH (const std::string &command, setup)
         {
+            context.logTime( std::string( "Starting: " + command ) );
             dbConn.executeNoResult (command);
         }
+        context.logTime( "Setup complete" );
 
         // Node attrs: id, lat, lon, user, visible, timestamp
         // Node children: tags with tag attrs k, v (split of tag line on ; and then =)
@@ -206,6 +212,7 @@ namespace modosmapi
         // Way attrs: id, user, visible, timestamp
         // Way children: nds with nd attr ref (node id)
 
+        context.logTime( "Getting nodes" );
         dbConn.execute( "SELECT nodes.id, latitude/10000000, longitude/10000000, visible, timestamp, tags FROM nodes INNER JOIN temp_node_ids ON nodes.id=temp_node_ids.id" );
 
         out << xml::setformat (4, ' ');
@@ -264,7 +271,6 @@ namespace modosmapi
             }
         }
 
-
         // TODO: Use a nice sorted vector as for the way tags
         typedef std::map<boost::uint64_t, std::vector<boost::uint64_t> > wayNodes_t;
         wayNodes_t wayNodes;
@@ -276,9 +282,10 @@ namespace modosmapi
 
             wayNodes[wayId].push_back( nodeId );
         }
+        context.logTime( "Retrieval complete" );
 
-        out << "Here2";
         // TODO: Use a nice sorted vector as for the way tags
+        context.logTime( "Retrieving relations" );
         typedef boost::tuple<boost::uint64_t, std::string, std::string, std::string> relationTag_t;
         typedef std::map<boost::uint64_t, std::vector<relationTag_t> > relationTags_t;
         relationTags_t relationTags;
@@ -293,7 +300,6 @@ namespace modosmapi
             relationTags[relationTag.get<0>()].push_back( relationTag );
         }
         
-        out << "Here4";
         typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, std::string> relationMember_t;
         typedef std::map<boost::uint64_t, std::vector<relationMember_t> > relationMembers_t;
         relationMembers_t relationMembers;
@@ -349,7 +355,9 @@ namespace modosmapi
             out << xml::dec;
             out << xml::indent << "</relation>\n";
         }
+        context.logTime( "Retrieval complete" );
 
+        context.logTime( "Retrieving ways" );
         std::vector<wayTag_t> wayTags;
         dbConn.execute( "SELECT way_tags.id, k, v, version FROM way_tags INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id" );
         while ( dbConn.next() )
@@ -402,6 +410,8 @@ namespace modosmapi
             out << xml::dec;
             out << xml::indent << "</way>\n";
         }
+
+        context.logTime( "Retrieval complete" );
 
 
         out << xml::dec;
