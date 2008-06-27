@@ -32,7 +32,7 @@ CPPFLAGS    += -Imod_osm
 CPPFLAGS    += $(APACHE_CPPFLAGS)
 
 CXXFLAGS    += -Wall -Werror
-CXXFLAGS    += -O2
+#CXXFLAGS    += -O2
 CXXFLAGS    += -fexceptions -finline-functions
 CXXFLAGS    += -g
 

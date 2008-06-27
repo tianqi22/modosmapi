@@ -8,20 +8,27 @@ namespace modosmapi
     {
     }
 
+    void BindArgDataHolder::ArgBinder::setMem( MYSQL_BIND &arg, enum enum_field_types type )
+    {
+        ArgParams_t *paramData = new ArgParams_t;
+        boost::shared_array<char> data( reinterpret_cast<char *>( paramData ) );
+        m_argMem.push_back( data );
+        
+        arg.buffer_type = type;
+        arg.is_null = &paramData->is_null;
+        arg.length  = &paramData->length;
+        arg.error   = &paramData->error;
+    }
+
     void BindArgDataHolder::ArgBinder::operator()( MYSQL_BIND &arg, const std::string &value )
     {
         boost::shared_array<char> data( new char[stringBufferSize] );
         m_argMem.push_back( data );
 
-        arg.buffer_type = MYSQL_TYPE_STRING;
+        setMem( arg, MYSQL_TYPE_STRING );
         arg.buffer = data.get();
         arg.buffer_length = stringBufferSize;
-        arg.is_null = 0;
-
-        long unsigned int *strLength = new long unsigned int;
-        data.reset( reinterpret_cast<char *>( strLength ) );
-        m_argMem.push_back( data );
-        arg.length = strLength;
+        *arg.is_null = 0;
     }
 
 
@@ -30,10 +37,11 @@ namespace modosmapi
         boost::shared_array<char> data( reinterpret_cast<char *>( new int ) );
         m_argMem.push_back( data );
 
+        setMem( arg, MYSQL_TYPE_LONG );
         arg.buffer_type = MYSQL_TYPE_LONG;
         arg.buffer = data.get();
         arg.is_unsigned = 0;
-        arg.is_null = 0;
+        *arg.is_null = 0;
     }
 
 
@@ -42,11 +50,10 @@ namespace modosmapi
         boost::shared_array<char> data( reinterpret_cast<char *>( new boost::uint64_t ) );
         m_argMem.push_back( data );
 
-        arg.buffer_type = MYSQL_TYPE_LONGLONG;
+        setMem( arg,  MYSQL_TYPE_LONGLONG );
         arg.buffer = data.get();
         arg.is_unsigned = 1;
-        arg.is_null = 0;
-        arg.length = 0;
+        *arg.is_null = 0;
     }
 
     void BindArgDataHolder::ArgBinder::operator()( MYSQL_BIND &arg, const boost::int64_t &value )
@@ -54,11 +61,10 @@ namespace modosmapi
         boost::shared_array<char> data( reinterpret_cast<char *>( new boost::int64_t ) );
         m_argMem.push_back( data );
 
-        arg.buffer_type = MYSQL_TYPE_LONGLONG;
+        setMem( arg, MYSQL_TYPE_LONGLONG );
         arg.buffer = data.get();
         arg.is_unsigned = 0;
-        arg.is_null = 0;
-        arg.length = 0;
+        *arg.is_null = 0;
     }
     
     void BindArgDataHolder::ArgBinder::operator()( MYSQL_BIND &arg, const double &value )
@@ -66,9 +72,9 @@ namespace modosmapi
         boost::shared_array<char> data( reinterpret_cast<char *>( new double ) );
         m_argMem.push_back( data );
 
-        arg.buffer_type = MYSQL_TYPE_DOUBLE;
+        setMem( arg, MYSQL_TYPE_DOUBLE );
         arg.buffer = data.get();
-        arg.is_null = 0;
+        arg.is_null = NULL;
     }
 
     void BindArgDataHolder::ArgBinder::operator()( MYSQL_BIND &arg, const bool &value )
@@ -80,40 +86,35 @@ namespace modosmapi
         boost::shared_array<char> buf( new char[sizeof(MYSQL_TIME)/sizeof(char)] );
         m_argMem.push_back( buf );
         
-        arg.buffer_type = MYSQL_TYPE_TIMESTAMP;
+        setMem( arg, MYSQL_TYPE_TIMESTAMP );
         arg.buffer = buf.get();
-        arg.is_null = 0;
-        arg.length = 0;
+        *arg.is_null = 0;
+        *arg.length = 0;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, std::string &value )
     {
-        value = std::string( reinterpret_cast<char *>( arg.buffer ), value.length() );
-        std::cout << "string val: " << value << std::endl;
+        value = std::string( reinterpret_cast<char *>( arg.buffer ), *arg.length );
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, int &value )
     {
         value = *reinterpret_cast<int *>( arg.buffer );
-        std::cout << "int val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, boost::uint64_t &value )
     {
         value = *reinterpret_cast<boost::uint64_t *>( arg.buffer );
-        std::cout << "uint64 val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, boost::int64_t &value )
     {
         value = *reinterpret_cast<boost::int64_t *>( arg.buffer );
-        std::cout << "int64 val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, double &value )
     {
         value = *reinterpret_cast<double *>( arg.buffer );
-        std::cout << "double val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, bool &value )
@@ -123,8 +124,6 @@ namespace modosmapi
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, boost::posix_time::ptime &datetime )
     {
         MYSQL_TIME *ts = reinterpret_cast<MYSQL_TIME *>( arg.buffer );
-
-        std::cout << ts->year << ", " << ts->month << ", " << ts->day << std::endl;
 
         datetime = boost::posix_time::ptime(
             boost::gregorian::date( ts->year, ts->month, ts->day ),
