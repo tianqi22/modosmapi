@@ -7,6 +7,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
+#include <boost/format.hpp>
 
 #include <boost/test/included/unit_test.hpp>
 #include <boost/test/floating_point_comparison.hpp>
@@ -78,7 +79,7 @@ void testDbHandler()
         {
             std::stringstream ss;
             ss << "Hello" << i;
-            testVec2.push_back( boost::make_tuple( i, ss.str(), 1231283721, i - 24, 3.14159254, "World", now ) );
+            testVec2.push_back( boost::make_tuple( i, ss.str(), 1231283721 + i, i - 24, 3.14159254, "World", now ) );
         }
 
         db.executeBulkInsert( "INSERT INTO test_temp2 VALUES( ?, ?, ?, ?, ?, ?, ? )", testVec2 );
@@ -104,7 +105,12 @@ void testDbHandler()
          {
              const testTuple_t &thisTuple = testVec3[i];
 
+             BOOST_CHECK_EQUAL( thisTuple.get<0>(), i );
+             BOOST_CHECK_EQUAL( thisTuple.get<1>(), boost::str( boost::format( "Hello%d" ) % i ) );
+             BOOST_CHECK_EQUAL( thisTuple.get<2>(), 1231283721 + i );
              BOOST_CHECK_EQUAL( thisTuple.get<3>(), i - 24 );
+             BOOST_CHECK_CLOSE( thisTuple.get<4>(), 3.141592654, 0.00001 );
+             BOOST_CHECK_EQUAL( thisTuple.get<5>(),  "World" );
          }
 
 

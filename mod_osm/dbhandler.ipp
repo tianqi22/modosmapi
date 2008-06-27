@@ -59,12 +59,10 @@ namespace modosmapi
         BindArgDataHolder dh( ps );
 
         T row;
-        dh.init( row );
+        dh.bindResults( row );
 
-        std::cout << "Fetch init" << std::endl;
         while ( !mysql_stmt_fetch( ps ) )
         {
-            std::cout << "Row fetch" << std::endl;
             dh.getArgs( row );
             result.push_back( row );
         }
@@ -82,7 +80,7 @@ namespace modosmapi
         {
             throw SqlException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
         }
-
+    
         if ( mysql_stmt_prepare( ps, query.c_str(), query.size() ) )
         {
             throw SqlException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
@@ -91,7 +89,7 @@ namespace modosmapi
 
         BindArgDataHolder dh( ps );
         T temp;
-        dh.init( temp );
+        dh.bindParams( temp );
 
         BOOST_FOREACH( const T &row, rows )
         {

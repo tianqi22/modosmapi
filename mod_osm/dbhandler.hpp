@@ -36,7 +36,8 @@ namespace modosmapi
     public:
         BindArgDataHolder( MYSQL_STMT *ps );
 
-        template<typename T> void init( const T &row );
+        template<typename T> void bindParams( const T &row );
+        template<typename T> void bindResults( const T &row );
         template<typename T> void setArgs( const T &row );
         template<typename T> void getArgs( T &row );
 
@@ -46,11 +47,18 @@ namespace modosmapi
         //       remove the index (no need)
         class ArgBinder
         {
+            struct ArgParams_t
+            {
+                my_bool is_null;
+                unsigned long length;
+                my_bool error;
+            };
             std::vector<boost::shared_array<char> > &m_argMem;
         public:
             ArgBinder( std::vector<boost::shared_array<char> > &argMem ) : m_argMem( argMem )
             {
             }
+            void setMem( MYSQL_BIND &arg, enum enum_field_types type );
             void operator()( MYSQL_BIND &arg, const std::string &value );
             void operator()( MYSQL_BIND &arg, const int &value );
             void operator()( MYSQL_BIND &arg, const boost::uint64_t &value );
@@ -98,7 +106,7 @@ namespace modosmapi
     };
     
     template<typename T>
-    void BindArgDataHolder::init( const T &row )
+    void BindArgDataHolder::bindParams( const T &row )
     {
         m_args.reset( new MYSQL_BIND[boost::tuples::length<T>::value] );
         
@@ -110,6 +118,21 @@ namespace modosmapi
             throw SqlException( std::string( "Param binding failed: " ) );//+ mysql_error( &m_dbconn ) );
         } 
     }
+
+    template<typename T>
+    void BindArgDataHolder::bindResults( const T &row )
+    {
+        m_args.reset( new MYSQL_BIND[boost::tuples::length<T>::value] );
+        
+        ArgBinder b( m_argMem );
+        applyRec( b, row, 0 );
+
+        if ( mysql_stmt_bind_result( m_ps, m_args.get() ) )
+        {       
+            throw SqlException( std::string( "Result binding failed: " ) );//+ mysql_error( &m_dbconn ) );
+        } 
+    }
+
     
     template<typename T>
     void BindArgDataHolder::setArgs( const T &row )
