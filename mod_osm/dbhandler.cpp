@@ -17,7 +17,11 @@ namespace modosmapi
         arg.buffer = data.get();
         arg.buffer_length = stringBufferSize;
         arg.is_null = 0;
-        arg.length = 0;
+
+        long unsigned int *strLength = new long unsigned int;
+        data.reset( reinterpret_cast<char *>( strLength ) );
+        m_argMem.push_back( data );
+        arg.length = strLength;
     }
 
 
@@ -30,7 +34,6 @@ namespace modosmapi
         arg.buffer = data.get();
         arg.is_unsigned = 0;
         arg.is_null = 0;
-        arg.length = 0;
     }
 
 
@@ -86,31 +89,31 @@ namespace modosmapi
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, std::string &value )
     {
         value = std::string( reinterpret_cast<char *>( arg.buffer ), value.length() );
-        std::cout << "val: " << value << std::endl;
+        std::cout << "string val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, int &value )
     {
         value = *reinterpret_cast<int *>( arg.buffer );
-        std::cout << "val: " << value << std::endl;
+        std::cout << "int val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, boost::uint64_t &value )
     {
         value = *reinterpret_cast<boost::uint64_t *>( arg.buffer );
-        std::cout << "val: " << value << std::endl;
+        std::cout << "uint64 val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, boost::int64_t &value )
     {
         value = *reinterpret_cast<boost::int64_t *>( arg.buffer );
-        std::cout << "val: " << value << std::endl;
+        std::cout << "int64 val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, double &value )
     {
         value = *reinterpret_cast<double *>( arg.buffer );
-        std::cout << "val: " << value << std::endl;
+        std::cout << "double val: " << value << std::endl;
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, bool &value )
@@ -135,8 +138,8 @@ namespace modosmapi
         {
             throw ;//std::exception( "String buffer size exceeded" );
         }
-        memcpy( arg.buffer, value.c_str(), value.size()+1 );
-        arg.buffer_length = value.size();
+        memcpy( arg.buffer, value.c_str(), value.size() );
+        *arg.length = ((long unsigned int) value.size());
     }
 
     void BindArgDataHolder::ArgSetter::operator()( MYSQL_BIND &arg, const int &value )

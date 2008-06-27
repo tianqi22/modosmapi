@@ -68,6 +68,8 @@ namespace modosmapi
             dh.getArgs( row );
             result.push_back( row );
         }
+
+        mysql_stmt_close( ps );
     }
 
     template<typename T>
@@ -101,8 +103,6 @@ namespace modosmapi
             }
         }
 
-
         mysql_stmt_close( ps );
-
     }
 }
