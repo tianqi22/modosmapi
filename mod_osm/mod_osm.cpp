@@ -13,6 +13,7 @@
 #include <exception>
 #include <vector>
 #include <map>
+#include <iomanip>
 
 #include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
@@ -185,6 +186,7 @@ extern "C"
        
         apacheStream_t as;
         as.open( ApachePageWriteSink( r ) );
+
 
         try
         {

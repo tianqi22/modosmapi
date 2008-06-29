@@ -71,7 +71,7 @@ template <> std::string quoteattr<std::string> (std::string input);
 template <typename T> std::string quoteattr (T input)
 {
     std::stringstream ss;
-    ss << input;
+    ss << std::setprecision( 10 ) << input;
     return quoteattr (ss.str ());
 }
 

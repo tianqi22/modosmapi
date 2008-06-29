@@ -23,6 +23,9 @@ public:
             std::cerr << t << ": " << message << std::endl;
         }
     }
+    void logError( const std::string &message )
+    {
+    }
 };
 
 void map(std::ostream &opFile, // destination for output

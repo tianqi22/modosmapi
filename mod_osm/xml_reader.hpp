@@ -9,6 +9,7 @@
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
 
 #include <xercesc/sax2/Attributes.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
@@ -130,6 +131,14 @@ public:
 // IPP bit
 
 template<typename T>
+void extended_lexical_cast( const std::string &val, T &var )
+{
+    var = boost::lexical_cast<T>( val );
+}
+
+void extended_lexical_cast( const std::string &val, bool &var );
+
+template<typename T>
 XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName, T &var, bool optional, T defaultValue )
 {
     attributeMap_t::iterator findIt = m_attributes.find( tagName );
@@ -149,12 +158,12 @@ XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName
     {
         try
         {
-            var = boost::lexical_cast<T>( findIt->second );
+            extended_lexical_cast( findIt->second, var );
         }
         catch ( std::exception &e )
         {
             std::cerr << "Trying to cast tag: " << tagName << " with value " << findIt->second;
-            std::cerr << " to type " << typeid( T ).name() << std::endl;
+            std::cerr << " to type " << typeid( var ).name() << std::endl;
             throw ;
         }
     }

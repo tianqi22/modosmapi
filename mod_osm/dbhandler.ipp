@@ -56,7 +56,7 @@ namespace modosmapi
             throw SqlException( "Query execution failed" );
         }
 
-        BindArgDataHolder dh( ps );
+        BindArgDataHolder dh( &m_dbconn, ps );
 
         T row;
         dh.bindResults( row );
@@ -87,7 +87,7 @@ namespace modosmapi
         }
 
 
-        BindArgDataHolder dh( ps );
+        BindArgDataHolder dh( &m_dbconn, ps );
         T temp;
         dh.bindParams( temp );
 

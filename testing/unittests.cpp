@@ -2,8 +2,11 @@
 #include "osm_data.hpp"
 #include "dbhandler.hpp"
 
+#include "engine.hpp"
+
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <boost/shared_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
@@ -11,6 +14,8 @@
 
 #include <boost/test/included/unit_test.hpp>
 #include <boost/test/floating_point_comparison.hpp>
+
+#include <iomanip>
 
 void testDbHandler()
 {
@@ -111,8 +116,8 @@ void testDbHandler()
              BOOST_CHECK_EQUAL( thisTuple.get<3>(), i - 24 );
              BOOST_CHECK_CLOSE( thisTuple.get<4>(), 3.141592654, 0.00001 );
              BOOST_CHECK_EQUAL( thisTuple.get<5>(),  "World" );
+             BOOST_CHECK_EQUAL( thisTuple.get<6>(), now );
          }
-
 
          db.executeNoResult( "DROP TABLE test_temp2" );
     }
@@ -185,14 +190,26 @@ void xmlParseTestFn()
     }
 }
 
+void tempMapQuery()
+{
+    std::ofstream ofs( "temp.txt" );
+    modosmapi::Context context;
+    modosmapi::map( ofs, context, 51.7387, 51.7803, -1.3163, -0.4132 );
+}
+
 
 boost::unit_test::test_suite* init_unit_test_suite( int argc, char **argv )
 {
     boost::unit_test::test_suite *test = BOOST_TEST_SUITE( "Master test suite" );
 
-    //test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
-    test->add( BOOST_TEST_CASE( &testDbHandler ) );
+    std::cout << "Here: " << std::endl;
+    std::cout << 3.141592654 << std::endl;
+    std::cout << std::fixed << std::setprecision(10);
+    std::cout << 3.141592565 << std::endl;
 
+    //test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
+    //test->add( BOOST_TEST_CASE( &testDbHandler ) );
+    test->add( BOOST_TEST_CASE( &tempMapQuery ) );
     return test;
 }
 
