@@ -10,6 +10,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <xercesc/sax2/Attributes.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
@@ -137,6 +138,7 @@ void extended_lexical_cast( const std::string &val, T &var )
 }
 
 void extended_lexical_cast( const std::string &val, bool &var );
+void extended_lexical_cast( const std::string &val, boost::posix_time::ptime &var );
 
 template<typename T>
 XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName, T &var, bool optional, T defaultValue )
