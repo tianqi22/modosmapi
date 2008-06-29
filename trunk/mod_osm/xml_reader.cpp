@@ -30,6 +30,26 @@ std::string transcodeString( const XMLCh *const toTranscode )
     return theString;
 }
 
+
+void extended_lexical_cast( const std::string &val, bool &var )
+{
+    std::string lowered( boost::algorithm::to_lower_copy( val ) );
+
+    if ( lowered == "true" || lowered == "1" )
+    {
+        var = true;
+    }
+    else if ( lowered == "false" || lowered == "0" )
+    {
+        var = false;
+    }
+    else
+    {
+        throw boost::bad_lexical_cast();
+    }
+}
+
+
 XercesInitWrapper::XercesInitWrapper()
 {
     xercesc::XMLPlatformUtils::Initialize();

@@ -4,7 +4,7 @@ namespace modosmapi
 {
     static const size_t stringBufferSize = 8192;
 
-    BindArgDataHolder::BindArgDataHolder( MYSQL_STMT *ps ) : m_ps( ps )
+    BindArgDataHolder::BindArgDataHolder( MYSQL *dbConn, MYSQL_STMT *ps ) : m_dbConn( dbConn ), m_ps( ps )
     {
     }
 
@@ -79,6 +79,12 @@ namespace modosmapi
 
     void BindArgDataHolder::ArgBinder::operator()( MYSQL_BIND &arg, const bool &value )
     {
+        boost::shared_array<char> data( reinterpret_cast<char *>( new char ) );
+        m_argMem.push_back( data );
+
+        setMem( arg, MYSQL_TYPE_TINY );
+        arg.buffer = data.get();
+        arg.is_null = NULL;
     }
 
     void BindArgDataHolder::ArgBinder::operator()( MYSQL_BIND &arg, const boost::posix_time::ptime &datetime )
@@ -119,6 +125,7 @@ namespace modosmapi
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, bool &value )
     {
+        value = *reinterpret_cast<my_bool *>( arg.buffer );
     }
 
     void BindArgDataHolder::ArgGetter::operator()( MYSQL_BIND &arg, boost::posix_time::ptime &datetime )
@@ -185,30 +192,30 @@ namespace modosmapi
         const std::string &dbpass ) : m_res( NULL ), m_row( NULL )
     {
         if ( created )
-            {
-                throw SqlException( "Single instance has already been created" );
-            }
+        {
+            throw SqlException( "Single instance has already been created" );
+        }
         created = true;
-
+        
         if ( !mysql_init( &m_dbconn ) )
-            {
-                throw SqlException( std::string( "Mysql init failure: " ) + mysql_error( &m_dbconn ) );
-            }
-
+        {
+            throw SqlException( std::string( "Mysql init failure: " ) + mysql_error( &m_dbconn ) );
+        }
+        
         if ( !mysql_real_connect( &m_dbconn, dbhost.c_str(), dbname.c_str(), dbuser.c_str(), dbpass.c_str(), 0, NULL, 0 ) )
-            {
-                throw SqlException( std::string( "Mysql connection failed: " ) + mysql_error( &m_dbconn ) );
-            }
+        {
+            throw SqlException( std::string( "Mysql connection failed: " ) + mysql_error( &m_dbconn ) );
+        }
     }
 
     void DbConnection::cleanUp()
     {
         if ( m_res )
-            {
-                mysql_free_result( m_res );
-                m_res = NULL;
-                m_row = NULL;
-            }
+        {
+            mysql_free_result( m_res );
+            m_res = NULL;
+            m_row = NULL;
+        }
         m_bulkInsertBuf.clear();
     }
 
@@ -218,9 +225,9 @@ namespace modosmapi
         cleanUp();
 
         if ( mysql_query( &m_dbconn, query.c_str() ) )
-            {
-                throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
-            }    
+        {
+            throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
+        }    
     }
 
 
@@ -229,22 +236,22 @@ namespace modosmapi
         cleanUp();
 
         if ( mysql_query( &m_dbconn, query.c_str() ) )
-            {
-                throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
-            }
-
+        {
+            throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
+        }
+        
         if ( !(m_res=mysql_use_result( &m_dbconn )) )
-            {
-                throw SqlException( std::string( "Result store failed: " ) + mysql_error( &m_dbconn ) );
-            }
+        {
+            throw SqlException( std::string( "Result store failed: " ) + mysql_error( &m_dbconn ) );
+        }
     }
 
     bool DbConnection::next()
     {
         if ( !m_res )
-            {
-                throw SqlException( "Cannot call next - no valid result" );
-            }
+        {
+            throw SqlException( "Cannot call next - no valid result" );
+        }
 
         m_row = mysql_fetch_row( m_res );
 

@@ -29,12 +29,13 @@ namespace modosmapi
     class BindArgDataHolder
     {
     private:
+        MYSQL *m_dbConn;
         MYSQL_STMT *m_ps;
         boost::scoped_array<MYSQL_BIND> m_args;
         std::vector<boost::shared_array<char> > m_argMem;
 
     public:
-        BindArgDataHolder( MYSQL_STMT *ps );
+        BindArgDataHolder( MYSQL *dbConn, MYSQL_STMT *ps );
 
         template<typename T> void bindParams( const T &row );
         template<typename T> void bindResults( const T &row );
@@ -53,9 +54,11 @@ namespace modosmapi
                 unsigned long length;
                 my_bool error;
             };
+
+            MYSQL *m_dbConn;
             std::vector<boost::shared_array<char> > &m_argMem;
         public:
-            ArgBinder( std::vector<boost::shared_array<char> > &argMem ) : m_argMem( argMem )
+            ArgBinder( MYSQL *dbConn, std::vector<boost::shared_array<char> > &argMem ) : m_dbConn( dbConn ), m_argMem( argMem )
             {
             }
             void setMem( MYSQL_BIND &arg, enum enum_field_types type );
@@ -110,11 +113,12 @@ namespace modosmapi
     {
         m_args.reset( new MYSQL_BIND[boost::tuples::length<T>::value] );
         
-        ArgBinder b( m_argMem );
+        ArgBinder b( m_dbConn, m_argMem );
         applyRec( b, row, 0 );
 
         if ( mysql_stmt_bind_param( m_ps, m_args.get() ) )
-        {       
+        {
+            std::cerr << "Param binding failed: " << mysql_error( m_dbConn ) << std::endl;
             throw SqlException( std::string( "Param binding failed: " ) );//+ mysql_error( &m_dbconn ) );
         } 
     }
@@ -124,7 +128,7 @@ namespace modosmapi
     {
         m_args.reset( new MYSQL_BIND[boost::tuples::length<T>::value] );
         
-        ArgBinder b( m_argMem );
+        ArgBinder b( m_dbConn, m_argMem );
         applyRec( b, row, 0 );
 
         if ( mysql_stmt_bind_result( m_ps, m_args.get() ) )
