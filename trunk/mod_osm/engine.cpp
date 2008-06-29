@@ -224,12 +224,22 @@ namespace modosmapi
         out << xml::inc;
 
         typedef boost::tuple<
-        boost::uint64_t,
-        boost::int64_t,
-        boost::int64_t,
-        bool,
-        boost::posix_time::ptime,
-        std::string> nodeData_t;
+            boost::uint64_t,
+            boost::int64_t,
+            boost::int64_t,
+            bool,
+            boost::posix_time::ptime,
+            std::string> nodeData_t;
+
+        context.logTime( "Getting users" );
+        typedef boost::tuple<boost::uint64_t, std::string> userData_t;
+        std::vector<userData_t> userData;
+        dbConn.executeBulkRetrieve( "SELECT id, display_name FROM users", userData );
+        std::map<boost::uint64_t, std::string> userMap;
+        BOOST_FOREACH( const userData_t &user, userData )
+        {
+            userMap.insert( std::make_pair( user.get<0>(), user.get<1>() ) );
+        }
 
         context.logTime( "Getting nodes" );
         std::vector<nodeData_t> nodesData;
@@ -239,14 +249,14 @@ namespace modosmapi
         BOOST_FOREACH( const nodeData_t &nodeData, nodesData )
         {
             const std::string nodeAttrNames[] = { "id", "lat", "lon", "visible", "timestamp" };
-            const std::string &tagString = boost::algorithm::trim_copy( nodeData.get<5>() );
+            const std::string &tagString = nodeData.get<5>();
             
             out << xml::indent << "<node " << xml::attrs (nodeAttrNames, boost::make_tuple(
-                                                              nodeData.get<0>(),
-                                                              nodeData.get<1>() / 10000000.0,
-                                                              nodeData.get<2>() / 10000000.0,
-                                                              nodeData.get<3>(),
-                                                              nodeData.get<4>() ) );
+               nodeData.get<0>(),
+               nodeData.get<1>() / 10000000.0,
+               nodeData.get<2>() / 10000000.0,
+               nodeData.get<3>(),
+               boost::posix_time::to_iso_extended_string( nodeData.get<4>() ) ) );
             
             std::vector<std::string> tags;
             boost::algorithm::split( tags, tagString, boost::algorithm::is_any_of( ";" ) );
@@ -276,7 +286,9 @@ namespace modosmapi
                         else
                         {
                             const std::string tagAttrNames[] = { "k", "v" };
-                            out << xml::indent << "<tag " << xml::attrs (tagAttrNames, boost::make_tuple (keyValue[0], keyValue[1])) << "/>\n";
+                            out << xml::indent << "<tag " << xml::attrs(tagAttrNames, boost::make_tuple( 
+                                boost::algorithm::trim_copy( keyValue[0] ),
+                                boost::algorithm::trim_copy( keyValue[1] ) ) ) << "/>\n";
                         }
                     }
                 }
@@ -374,24 +386,15 @@ namespace modosmapi
         context.logTime( "Retrieving ways" );
         std::vector<wayTag_t> wayTags;
         dbConn.executeBulkRetrieve( "SELECT way_tags.id, k, v, version FROM way_tags INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id", wayTags );
-        //         dbConn.execute( "SELECT way_tags.id, k, v, version FROM way_tags INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id" );
-        //         while ( dbConn.next() )
-        //         {
-        //             wayTag_t wayTag;
-
-        //             dbConn.readRow( wayTag );
-
-        //             wayTags.push_back( wayTag );
-        //         }
 
         std::sort( wayTags.begin(), wayTags.end(), WayTagLt() );
 
         // TODO: Look up the user name from user id
         typedef boost::tuple<
-        boost::uint64_t,
-        bool,
-        std::string,
-        boost::uint64_t> wayData_t;
+            boost::uint64_t,
+            bool,
+            boost::posix_time::ptime,
+            boost::uint64_t> wayData_t;
     
         std::vector<wayData_t> waysData;
         dbConn.executeBulkRetrieve( "SELECT ways.id, visible, timestamp, user_id FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id", waysData );
@@ -402,7 +405,13 @@ namespace modosmapi
             
             const std::string wayAttrNames[] = { "id", "visible", "timestamp", "user" };
             
-            out << xml::indent << "<way " << xml::attrs (wayAttrNames, wayData) << ">\n";
+            out << xml::indent << "<way " << xml::attrs (wayAttrNames,
+                boost::make_tuple(
+                    wayData.get<0>(),
+                    wayData.get<1>(),
+                    boost::posix_time::to_iso_extended_string( wayData.get<2>() ),
+                    wayData.get<3>() ) ) << ">\n";
+
             out << xml::inc;
             
             wayNodes_t::iterator findIt = wayNodes.find( wayId );

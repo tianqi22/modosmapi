@@ -13,6 +13,7 @@
 #include <boost/function.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 typedef boost::uint64_t dbId_t;
 typedef std::string string_t;
@@ -65,7 +66,7 @@ class OSMBase
 {
 protected:
     dbId_t   m_id;
-    string_t m_timestamp;
+    boost::posix_time::ptime m_timestamp;
     string_t m_user;
     dbId_t   m_userId;
 
@@ -73,7 +74,7 @@ protected:
 
 public:
     dbId_t getId() const { return m_id; }
-    const string_t &getTimeStamp() const { return m_timestamp; }
+    const boost::posix_time::ptime &getTimeStamp() const { return m_timestamp; }
     const string_t &getUser() const { return m_user; }
     dbId_t getUserId() const { return m_userId; }
 };

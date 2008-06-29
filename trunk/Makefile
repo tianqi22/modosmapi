@@ -13,7 +13,7 @@ Q           := $(if $(VERBOSE),,@)
 APACHE_CPPFLAGS := -I/usr/include/apache2 \
                    -I/usr/include/apr-1.0
 
-BOOST_LDLIBS      := -lboost_iostreams
+BOOST_LDLIBS      := -lboost_iostreams -lboost_date_time
 BOOST_TEST_LDLIBS := -lboost_unit_test_framework
 MYSQL_LDLIBS      := -lmysqlclient
 XERCES_LDLIBS     := -lxerces-c

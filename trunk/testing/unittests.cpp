@@ -159,8 +159,11 @@ void testXMLRead( std::string fileName, XercesInitWrapper &x )
     const boost::shared_ptr<OSMWay> &theWay = newFragment.getWays().begin()->second;
 
     BOOST_CHECK_EQUAL( theWay->getId(), 3236218 );
-    //BOOST_CHECK_EQUAL( theWay->getVisible(), true );
-    BOOST_CHECK_EQUAL( theWay->getTimeStamp(), "2008-03-02T22:38:37+00:00" );
+    BOOST_CHECK_EQUAL( theWay->getVisible(), true );
+    BOOST_CHECK_EQUAL( theWay->getTimeStamp(), boost::posix_time::ptime(
+        boost::gregorian::date( 2008, 3, 2 ),
+        boost::posix_time::time_duration( 22, 38, 37 ) ) );
+
     BOOST_CHECK_EQUAL( theWay->getUser(), "Antoine Sirinelli" );
 
     BOOST_CHECK_EQUAL( theWay->getTags().find("highway")->second, "tertiary" );

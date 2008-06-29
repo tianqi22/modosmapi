@@ -49,6 +49,13 @@ void extended_lexical_cast( const std::string &val, bool &var )
     }
 }
 
+void extended_lexical_cast( const std::string &val, boost::posix_time::ptime &var )
+{
+    std::cerr << "Here" << std::endl;
+    var = boost::posix_time::time_from_string( val );
+    std::cerr << "With: " << val << ", " << var << std::endl;
+}
+
 
 XercesInitWrapper::XercesInitWrapper()
 {
