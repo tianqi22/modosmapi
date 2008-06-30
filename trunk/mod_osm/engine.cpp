@@ -256,7 +256,7 @@ namespace modosmapi
                nodeData.get<1>() / 10000000.0,
                nodeData.get<2>() / 10000000.0,
                nodeData.get<3>(),
-               boost::posix_time::to_iso_extended_string( nodeData.get<4>() ) ) );
+               boost::posix_time::to_iso_extended_string( nodeData.get<4>() ) + "+00:00" ) );
             
             std::vector<std::string> tags;
             boost::algorithm::split( tags, tagString, boost::algorithm::is_any_of( ";" ) );
@@ -341,18 +341,22 @@ namespace modosmapi
         }
         
 
-        typedef boost::tuple<boost::uint64_t, bool, std::string, boost::uint64_t> relation_t;
+        typedef boost::tuple<boost::uint64_t, bool, boost::posix_time::ptime, boost::uint64_t> relation_t;
+        std::vector<relation_t> relations;
+        dbConn.executeBulkRetrieve( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
+            "temp_relation_ids ON relations.id=temp_relation_ids.id", relations );
+
         const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
-        dbConn.execute( "SELECT relations.id, visible, timestamp, user_id FROM relations INNER JOIN "
-            "temp_relation_ids ON relations.id=temp_relation_ids.id" );
+        BOOST_FOREACH( const relation_t &relation, relations )
+        {        
+            out << xml::indent << "<relation " << xml::attrs(
+                relationTagNames,
+                boost::make_tuple(
+                    relation.get<0>(),
+                    relation.get<1>(),
+                    boost::posix_time::to_iso_extended_string( relation.get<2>() ) + "+00:00",
+                    relation.get<3>() ) ) << ">\n";
 
-
-        while ( dbConn.next() )
-        {
-            relation_t relation;
-            dbConn.readRow( relation );
-            
-            out << xml::indent << "<relation " << xml::attrs (relationTagNames, relation) << ">\n";
             out << xml::inc;
             
             relationTags_t::iterator rFindIt = relationTags.find( relation.get<0>() );
@@ -409,7 +413,7 @@ namespace modosmapi
                 boost::make_tuple(
                     wayData.get<0>(),
                     wayData.get<1>(),
-                    boost::posix_time::to_iso_extended_string( wayData.get<2>() ),
+                    boost::posix_time::to_iso_extended_string( wayData.get<2>() ) + "+00:00",
                     wayData.get<3>() ) ) << ">\n";
 
             out << xml::inc;

@@ -31,7 +31,7 @@ void compareTags( const tagMap_t &lhs, const tagMap_t &rhs, const EqualityTester
 void compareBase( const OSMBase &lhs, const OSMBase &rhs, const EqualityTester &tester )
 {
     tester.requireEqual( lhs.getId(), rhs.getId(), "Ids do not match" );
-    //tester.requireEqual( lhs.getTimeStamp(), rhs.getTimeStamp(), "Timestamps do not match" );
+    tester.requireEqual( lhs.getTimeStamp(), rhs.getTimeStamp(), "Timestamps do not match" );
     //tester.requireEqual( lhs.getUser(), rhs.getUser(), "User names do not match" );
     tester.requireEqual( lhs.getUserId(), rhs.getUserId(), "User ids do not match" );
 }
