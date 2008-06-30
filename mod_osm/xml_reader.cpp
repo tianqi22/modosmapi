@@ -1,7 +1,11 @@
 #include <iostream>
 
 #include <boost/format.hpp>
+#include <boost/regex.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 
 #include <xercesc/util/PlatformUtils.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
@@ -49,11 +53,35 @@ void extended_lexical_cast( const std::string &val, bool &var )
     }
 }
 
+const boost::regex dateRegex( "(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})([\\+-]\\d{2}):(\\d{2})?" );
+
 void extended_lexical_cast( const std::string &val, boost::posix_time::ptime &var )
 {
-    std::cerr << "Here" << std::endl;
-    var = boost::posix_time::time_from_string( val );
-    std::cerr << "With: " << val << ", " << var << std::endl;
+    boost::smatch match;
+    if ( boost::regex_match( val, match, dateRegex ) )
+    {
+         var = boost::posix_time::ptime(
+             boost::gregorian::date(
+                 boost::lexical_cast<int>( match[1] ),
+                 boost::lexical_cast<int>( match[2] ),
+                 boost::lexical_cast<int>( match[3] ) ),
+             boost::posix_time::time_duration(
+                 boost::lexical_cast<int>( match[4] ),
+                 boost::lexical_cast<int>( match[5] ),
+                 boost::lexical_cast<int>( match[6] ) ) );
+
+         boost::posix_time::time_duration offset(
+             boost::lexical_cast<int>( match[7] ),
+             boost::lexical_cast<int>( match[8] ),
+             0 );
+
+         // TODO: Surely we should be adding this offset? But it doesn't seem to work...
+         //var += offset;
+    }
+    else
+    {
+        throw boost::bad_lexical_cast();
+    }
 }
 
 
