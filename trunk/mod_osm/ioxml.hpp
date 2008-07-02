@@ -80,29 +80,33 @@ namespace
 template<typename T>
 void renderTags (const boost::tuples::cons<T, boost::tuples::null_type> &tuple,
                  const std::string attrNames[],
-                 std::vector<std::string> &tags,
+                 std::stringstream &os,
                  int index )
 {
-    tags.push_back (attrNames[index] + "=" + quoteattr (tuple.head));
+    os << attrNames[index] << tuple.head;
+    //tags.push_back (attrNames[index] + "=" + quoteattr (tuple.head));
 }
 
 template<typename T1, typename T2>
 void renderTags (const boost::tuples::cons<T1, T2> &tuple,
                  const std::string attrNames[],
-                 std::vector<std::string> &tags,
+                 std::stringstream &os,
                  int index )
 {
-    tags.push_back (attrNames[index] + "=" + quoteattr (tuple.head));
-    renderTags (tuple.tail, attrNames, tags, index + 1);
+    os << attrNames[index] << "=" << tuple.head << " ";
+    //tags.push_back (attrNames[index] + "=" + quoteattr (tuple.head));
+    renderTags (tuple.tail, attrNames, os, index + 1);
 }
 } // end anonymous namespace
 
 template<typename T1, typename T2>
 std::string attrs (const std::string attrNames[], const boost::tuples::cons<T1, T2> &attrValueTuple)
 {
-    std::vector<std::string> tags;
-    renderTags (attrValueTuple, attrNames, tags, 0);
-    return boost::algorithm::join (tags, " ");
+    std::stringstream ss;
+
+    renderTags (attrValueTuple, attrNames, ss, 0);
+
+    return ss.str();
 }
 
 } // end namespace xml

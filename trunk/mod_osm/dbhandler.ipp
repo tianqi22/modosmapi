@@ -36,7 +36,7 @@ namespace modosmapi
     }
 
     template<typename T>
-    void DbConnection::executeBulkRetrieve( std::string query, std::vector<T> &result )
+    void DbConnection::executeBulkRetrieve( std::string query, boost::function<void( const T & )> fn )
     {
         cleanUp();
 
@@ -64,11 +64,19 @@ namespace modosmapi
         while ( !mysql_stmt_fetch( ps ) )
         {
             dh.getArgs( row );
-            result.push_back( row );
+            fn( row );
         }
 
         mysql_stmt_close( ps );
     }
+
+    template<typename T>
+    void DbConnection::executeBulkRetrieve( std::string query, std::vector<T> &result )
+    {
+        boost::function<void( const T & )> fn = boost::bind( &std::vector<T>::push_back, boost::ref( result ), _1 );
+        executeBulkRetrieve( query, fn );
+    }
+
 
     template<typename T>
     void DbConnection::executeBulkInsert( std::string query, const std::vector<T> &rows )

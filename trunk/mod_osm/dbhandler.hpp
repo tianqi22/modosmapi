@@ -10,6 +10,7 @@
 #include <boost/shared_array.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/bind.hpp>
+#include <boost/function.hpp>
 
 #include <mysql/mysql.h>
 
@@ -201,7 +202,8 @@ namespace modosmapi
         template<typename T1, typename T2>
         void readRow( boost::tuples::cons<T1, T2> &t, size_t index=0 );
 
-        template<typename T> void executeBulkInsert( std::string query, const std::vector<T> &rows );
+        template<typename T> void executeBulkInsert  ( std::string query, const std::vector<T> &rows );
+        template<typename T> void executeBulkRetrieve( std::string query, boost::function<void( const T & )> fn );
         template<typename T> void executeBulkRetrieve( std::string query, std::vector<T> &result );
 
     private:
