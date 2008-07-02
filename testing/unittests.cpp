@@ -17,6 +17,18 @@
 
 #include <iomanip>
 
+typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, int, double, std::string, boost::posix_time::ptime> testTuple_t;
+
+struct CallBackTester
+{
+    std::vector<testTuple_t> data;
+
+    void addRow( const testTuple_t &row )
+    {
+        data.push_back( row );
+    }
+};
+
 void testDbHandler()
 {
     try
@@ -73,8 +85,6 @@ void testDbHandler()
         db.executeNoResult( "DROP TABLE test_temp" );
         db.executeNoResult( "CREATE TEMPORARY TABLE test_temp2( id INT, text1 VARCHAR(255), nid BIGINT, value1 INT, value2 DOUBLE, text2 TEXT, time DATETIME  )" );
 
-        typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, int, double, std::string, boost::posix_time::ptime> testTuple_t;
-
         boost::posix_time::ptime now = boost::posix_time::ptime(
             boost::gregorian::date( 2008, 06, 10 ),
             boost::posix_time::time_duration( 18, 16, 00 ) );
@@ -109,6 +119,23 @@ void testDbHandler()
          for ( int i = 0; i < 100; i++ )
          {
              const testTuple_t &thisTuple = testVec3[i];
+
+             BOOST_CHECK_EQUAL( thisTuple.get<0>(), i );
+             BOOST_CHECK_EQUAL( thisTuple.get<1>(), boost::str( boost::format( "Hello%d" ) % i ) );
+             BOOST_CHECK_EQUAL( thisTuple.get<2>(), 1231283721 + i );
+             BOOST_CHECK_EQUAL( thisTuple.get<3>(), i - 24 );
+             BOOST_CHECK_CLOSE( thisTuple.get<4>(), 3.141592654, 0.00001 );
+             BOOST_CHECK_EQUAL( thisTuple.get<5>(),  "World" );
+             BOOST_CHECK_EQUAL( thisTuple.get<6>(), now );
+         }
+
+         CallBackTester t;
+         boost::function<void( const testTuple_t & )> fn = boost::bind( &CallBackTester::addRow, boost::ref( t ), _1 );
+         db.executeBulkRetrieve( "SELECT id, text1, nid, value1, value2, text2, time FROM test_temp2 ORDER BY id", fn );
+
+         for ( int i = 0; i < 100; i++ )
+         {
+             const testTuple_t &thisTuple = t.data[i];
 
              BOOST_CHECK_EQUAL( thisTuple.get<0>(), i );
              BOOST_CHECK_EQUAL( thisTuple.get<1>(), boost::str( boost::format( "Hello%d" ) % i ) );
