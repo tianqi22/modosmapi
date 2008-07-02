@@ -62,13 +62,13 @@ namespace modosmapi
             bool,
             boost::posix_time::ptime,
             std::string> nodeData_t;
-
+        
         typedef boost::tuple<
             boost::uint64_t,
             bool,
             boost::posix_time::ptime,
             boost::uint64_t> wayData_t;
-
+    
         typedef boost::tuple<
             boost::uint64_t,
             bool,
@@ -97,6 +97,8 @@ namespace modosmapi
             boost::uint64_t,
             std::string> relationMember_t;
 
+        typedef boost::tuple<boost::uint64_t, boost::uint64_t> wayNode_t;
+
         typedef std::map<boost::uint64_t, std::vector<wayTag_t> > wayTags_t; 
         typedef std::map<boost::uint64_t, std::vector<relationTag_t> > relationTags_t;
         typedef std::map<boost::uint64_t, std::vector<boost::uint64_t> > wayNodes_t;
@@ -110,7 +112,7 @@ namespace modosmapi
         wayNodes_t m_wayNodes;
         wayTags_t m_wayTags;
         relationTags_t m_relationTags;
-        relationMembers_t relationMembers;
+        relationMembers_t m_relationMembers;
 
     public:
         MapQueryGen( std::ostream &out, Context &context, double minLat, double maxLat, double minLon, double MaxLon );
@@ -125,13 +127,19 @@ namespace modosmapi
         void cleanupTemporaryTables();
 
         void addUser( const userData_t &userData );
-        void addWayNode( const boost::tuple<boost::uint64_t, boost::uint64_t> &wayNode );
+        void addWayNode( const wayNode_t &wayNode );
         void addWayTag( const wayTag_t &wayTag );
         void addRelationTag( const relationTag_t &relationTag );
         void addRelationMember( const relationMember_t &relationMember );
-    };
+};
 
-MapQueryGen::MapQueryGen( std::ostream &out, Context &context, double minLat, double maxLat, double minLon, double MaxLon ) :
+template<typename ArgType, typename FnType>
+boost::function<void( const ArgType & )> cbFn( FnType fn )
+{
+    return boost::function<void( const ArgType & )>( fn );
+}
+
+MapQueryGen::MapQueryGen( std::ostream &out, Context &context, double minLat, double maxLat, double minLon, double maxLon ) :
     m_dbConn( "localhost", "openstreetmap", "openstreetmap", "openstreetmap" ),
     m_out( out ), m_context( context )
 {
@@ -140,28 +148,28 @@ MapQueryGen::MapQueryGen( std::ostream &out, Context &context, double minLat, do
     // Fill the user, tag and member tables
     m_context.logTime( "Getting users" );
     m_dbConn.executeBulkRetrieve( "SELECT id, display_name FROM users",
-        boost::function( boost::bind( &MapQueryGen::addUser, boost::ref( this ), _1 ) ) );
+        cbFn<userData_t>( boost::bind( &MapQueryGen::addUser, boost::ref( this ), _1 ) ) );
     
     m_context.logTime( "Getting way nodes" );
     m_dbConn.executeBulkRetrieve( "SELECT way_nodes.id, node_id FROM way_nodes "
         "INNER JOIN temp_way_ids ON way_nodes.id=temp_way_ids.id",
-        boost::function( boost::bind( &MapQueryGen::addWayNode, boost::ref( this ), _1 ) ) );
+        cbFn<wayNode_t>( boost::bind( &MapQueryGen::addWayNode, boost::ref( this ), _1 ) ) );
     
     m_context.logTime( "Getting relation tags" );
     m_dbConn.executeBulkRetrieve( "SELECT relation_tags.id, k, v, version FROM relation_tags "
         "INNER JOIN temp_relation_ids ON relation_tags.id=temp_relation_ids.id",
-        boost::function( boost::bind( &MapQueryGen::addRelationTag, boost::ref( this ), _1 ) ) );
+        cbFn<relationTag_t>( boost::bind( &MapQueryGen::addRelationTag, boost::ref( this ), _1 ) ) );
     
     m_context.logTime( "Getting relation members" );
-    m_dbConn.executeBulkRetrieval( "SELECT relation_members.id, member_type, member_id, "
+    m_dbConn.executeBulkRetrieve( "SELECT relation_members.id, member_type, member_id, "
         "member_role FROM relation_members INNER JOIN temp_relation_ids "
         "ON relation_members.id=temp_relation_ids.id",
-        boost::function( boost::bind( &MapQueryGen::addRelationMember, boost::ref( this ), _1 ) ) );
+        cbFn<relationMember_t>( boost::bind( &MapQueryGen::addRelationMember, boost::ref( this ), _1 ) ) );
     
     m_context.logTime( "Getting way tags" );
     m_dbConn.executeBulkRetrieve( "SELECT way_tags.id, k, v, version FROM way_tags "
         "INNER JOIN temp_way_ids ON way_tags.id=temp_way_ids.id",
-        boost::function( boost::bind( &MapQueryGen::addWayTag, boost::ref( this ), _1 ) ) );
+        cbFn<wayTag_t>( boost::bind( &MapQueryGen::addWayTag, boost::ref( this ), _1 ) ) );
     
     outputXML();
 }
@@ -179,17 +187,17 @@ void MapQueryGen::outputXML()
     m_dbConn.executeBulkRetrieve( "SELECT nodes.id, latitude, longitude, visible, "
         "timestamp, tags FROM nodes INNER JOIN temp_node_ids "
         "ON nodes.id=temp_node_ids.id",
-        boost::function( boost::bind( &MapQueryGen::outputNode, boost::ref( this ), _1 ) ) );
+        cbFn<nodeData_t>( boost::bind( &MapQueryGen::outputNode, boost::ref( this ), _1 ) ) );
     
     m_context.logTime( "Outputting ways" );
     m_dbConn.executeBulkRetrieve( "SELECT ways.id, visible, timestamp, user_id "
         "FROM ways INNER JOIN temp_way_ids ON ways.id=temp_way_ids.id",
-        boost::function( boost::bind( &MapQueryGen::outputWay, boost::ref( this ), _1 ) ) );
+        cbFn<wayData_t>( boost::bind( &MapQueryGen::outputWay, boost::ref( this ), _1 ) ) );
     
     m_context.logTime( "Outputting relations" );
     m_dbConn.executeBulkRetrieve( "SELECT relations.id, visible, timestamp, user_id "
         "FROM relations INNER JOIN temp_relation_ids ON relations.id=temp_relation_ids.id",
-        boost::function( boost::bind( &MapQueryGen::outputRelation, boost::ref( this ), _1 ) ) );
+        cbFn<relationData_t>( boost::bind( &MapQueryGen::outputRelation, boost::ref( this ), _1 ) ) );
     
     m_out << xml::dec;
     m_out << xml::indent << "</osm>\n";
@@ -197,7 +205,7 @@ void MapQueryGen::outputXML()
     m_context.logTime( "XML output complete. Clearing up..." );
 }
 
-void MapQueryGen::outputNode( const nodeTuple_t &node )
+void MapQueryGen::outputNode( const nodeData_t &nodeData )
 {
     const std::string nodeAttrNames[] = { "id", "lat", "lon", "visible", "timestamp" };
     const std::string &tagString = nodeData.get<5>();
@@ -248,7 +256,7 @@ void MapQueryGen::outputNode( const nodeTuple_t &node )
     }
 }
 
-void MapQueryGen::outputWay( const wayTuple_t &wayData )
+void MapQueryGen::outputWay( const wayData_t &wayData )
 {
     boost::uint64_t wayId = wayData.get<0>();
     
@@ -263,8 +271,8 @@ void MapQueryGen::outputWay( const wayTuple_t &wayData )
     
     m_out << xml::inc;
     
-    wayNodes_t::iterator wFindIt = wayNodes.find( wayId );
-    if ( wFindIt != wayNodes.end() )
+    wayNodes_t::iterator wFindIt = m_wayNodes.find( wayId );
+    if ( wFindIt != m_wayNodes.end() )
     {
         BOOST_FOREACH( boost::uint64_t nodeId, wFindIt->second )
         {
@@ -272,8 +280,8 @@ void MapQueryGen::outputWay( const wayTuple_t &wayData )
         } 
     }
     
-    wayTags_t::iterator tFindIt = wayTags.find( wayId );
-    if ( tFindIt != wayTags.end() )
+    wayTags_t::iterator tFindIt = m_wayTags.find( wayId );
+    if ( tFindIt != m_wayTags.end() )
     {
         BOOST_FOREACH( const wayTag_t &wayTag, tFindIt->second )
         {
@@ -300,8 +308,8 @@ void MapQueryGen::outputRelation( const relationData_t &relation )
     
     m_out << xml::inc;
     
-    relationTags_t::iterator rFindIt = relationTags.find( relation.get<0>() );
-    if ( rFindIt != relationTags.end() )
+    relationTags_t::iterator rFindIt = m_relationTags.find( relation.get<0>() );
+    if ( rFindIt != m_relationTags.end() )
     {
         const std::string tagTagNames[] = { "k", "v" };
         BOOST_FOREACH( const relationTag_t &theTag, rFindIt->second )
@@ -313,8 +321,8 @@ void MapQueryGen::outputRelation( const relationData_t &relation )
         }
     }
     
-    relationMembers_t::iterator mFindIt = relationMembers.find( relation.get<0>() );
-    if ( mFindIt != relationMembers.end() )
+    relationMembers_t::iterator mFindIt = m_relationMembers.find( relation.get<0>() );
+    if ( mFindIt != m_relationMembers.end() )
     {
         const std::string memberTagNames[] = { "type", "ref", "role" };
         BOOST_FOREACH( const relationMember_t &theMember, mFindIt->second )
@@ -332,7 +340,7 @@ MapQueryGen::~MapQueryGen()
     cleanupTemporaryTables();
 }
 
-void MapQueryGen::setupTemporaryTables( double minLat, double maxLat, double minLon, double MaxLon )
+void MapQueryGen::setupTemporaryTables( double minLat, double maxLat, double minLon, double maxLon )
 {
     boost::int64_t minLatInt = (minLat * 10000000.0);
     boost::int64_t maxLatInt = (maxLat * 10000000.0);
