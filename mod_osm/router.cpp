@@ -175,7 +175,7 @@ void AStarVisitor::examine_vertex( VertexType u, const GraphType &g )
 }
 
 
-RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
+RoutingGraph::RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
 {
     // TODO: We may want to fill these from a config file (not that likely to change though...)
     m_routeWayKeys.push_back( "highway" );
@@ -183,7 +183,7 @@ RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
     m_routeWayKeys.push_back( "tracktype" );
 }
 
-VertexType getVertex( boost::uint64_t nodeId )
+VertexType RoutingGraph::getVertex( boost::uint64_t nodeId )
 {
     nodeIdToVertexMap_t::const_iterator findIt = m_nodeIdToVertexMap.find( nodeId );
         
@@ -204,7 +204,7 @@ VertexType getVertex( boost::uint64_t nodeId )
 }
 
 
-EdgeType addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way )
+EdgeType RoutingGraph::addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way )
 {
     // Returns a pair: Edge descriptor, bool (true if edge added)
     EdgeType thisEdge;
@@ -218,7 +218,7 @@ EdgeType addEdge( VertexType source, VertexType dest, double length, boost::shar
     return thisEdge;
 }
     
-bool validRoutingWay( const boost::shared_ptr<OSMWay> &way )
+bool RoutingGraph::validRoutingWay( const boost::shared_ptr<OSMWay> &way )
 {
     const tagMap_t &tags = way->getTags();
 
@@ -228,12 +228,13 @@ bool validRoutingWay( const boost::shared_ptr<OSMWay> &way )
         {
             return true;
         }
-        return false;
     }
+
+    return false;
 }
 
     
-void build()
+void RoutingGraph::build()
 {
     // First pass: count the number of ways each node belongs to
     typedef std::map<boost::uint64_t, size_t> nodeCountInWays_t;
@@ -262,7 +263,7 @@ void build()
         const boost::shared_ptr<OSMWay> &way = v.second;
         if ( validRoutingWay( way ) )
         {
-            VertexType lastRouteVertex;
+            VertexType lastRouteVertex = VertexType();
             boost::shared_ptr<OSMNode> lastNode;
             double cumulativeDistance= 0.0;
             BOOST_FOREACH( boost::uint64_t nodeId, way->getNodes() )
@@ -303,7 +304,7 @@ void build()
 }
 
 // Assumes both nodes exists in the routing graph
-void calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, std::list<boost::uint64_t> &route )
+void RoutingGraph::calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, std::list<boost::uint64_t> &route )
 {
     // Get the begin and end vertices
     nodeIdToVertexMap_t::const_iterator findIt;
