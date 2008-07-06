@@ -1,34 +1,18 @@
-# if 0
 
-#include <boost/bind.hpp>
-//#include <boost/tuple.hpp>
-#include <boost/mem_fn.hpp>
-#include <boost/python.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/dijkstra_shortest_paths.hpp>
+#include <boost/graph/astar_search.hpp>
 
 
 #include <iostream>
 #include <map>
 #include <cmath>
 
+#include "osm_data.hpp"
+#include "exceptions.hpp"
+
 using namespace std;
-
-typedef boost::adjacency_list<
-    boost::vecS,
-    boost::vecS,
-    boost::bidirectionalS,
-    boost::property<boost::vertex_name_t, int>,
-    boost::property<boost::edge_weight_t, double> > GraphType;
-
-typedef boost::graph_traits<GraphType>::vertex_descriptor VertexType;
-typedef boost::graph_traits<GraphType>::edge_descriptor EdgeType;
-
-typedef boost::property_map<GraphType, boost::edge_weight_t>::type EdgeWeightMapType;
-typedef boost::property_map<GraphType, boost::vertex_name_t>::type NodeIndexMapType;
-
 
 const double PI = acos( -1.0 );
 
@@ -43,286 +27,260 @@ double distBetween( double lat1, double lon1, double lat2, double lon2 )
     return 6378.0 * acos(cos(a1)*cos(b1)*cos(a2)*cos(b2) + cos(a1)*sin(b1)*cos(a2)*sin(b2) + sin(a1)*sin(a2));
 }
 
-// * Iterate over ways and keep count of the number of times a node is encountered
-// * Iterate over ways again, and add a routing node for each start node, end node and multiple way node
-// * Ready to route!
+typedef boost::adjacency_list<
+    // Both edges and all vertices stored in vectors
+    boost::vecS,
+    boost::vecS,
+    // Access to both input and output edges, in a directed graph
+    boost::bidirectionalS,
+    boost::property<boost::vertex_name_t, int>,
+    boost::property<boost::edge_weight_t, double> > GraphType;
 
-struct NodeData
+typedef boost::graph_traits<GraphType>::vertex_descriptor VertexType;
+typedef boost::graph_traits<GraphType>::edge_descriptor EdgeType;
+
+typedef boost::property_map<GraphType, boost::edge_weight_t>::type EdgeWeightMapType;
+typedef boost::property_map<GraphType, boost::vertex_name_t>::type NodeIndexMapType;
+
+
+typedef std::map<boost::uint64_t, VertexType> nodeIdToVertexMap_t;
+
+class DistanceHeuristic : public boost::astar_heuristic<GraphType, double>
 {
-    int nodeId;
-    double lat, lon;
-    int inNumWays;
-
-    // TODO: Don't really need to make a Vertex for all nodes. This is inefficient
-    VertexType v;
-   
-    NodeData( int nodeId_, double lat_, double lon_, int inNumWays_, VertexType v_ ) :
-        nodeId( nodeId_ ), lat( lat_ ), lon( lon_ ), inNumWays( inNumWays_ ), v( v_ )
-    {
-    }
-
-    double distanceFrom( const NodeData &other ) const
-    {
-        return abs( distBetween( lat, lon, other.lat, other.lon ) );
-    }
-};
-
-// template<class T>
-// class ContainerWrapper
-// {
-//     T c;
-//     typename T::iterator it, endIt;
-// public:
-//     ContainerWrapper( const ContainerWrapper<T> &other ) : c( other.c )
-//     {
-//         it = c.begin();
-//         endIt = c.end();
-//     }
-//     ContainerWrapper( T &c_ ) : c( c_ )
-//     {
-//         it = c.begin();
-//         endIt = c.end();
-//     }
-
-//     bool end() { return it == endIt; }
-//     void next() { it++; }
-//     typename T::iterator::value_type get() { return *it; }
-// };
-
-// typedef ContainerWrapper<vector<pair<int, double> > > DistReturnType;
-
-
-
-class GraphBuilder
-{
-    map<int, NodeData *> idToNodeMap;
-    GraphType g;
-    VertexType lastVertex;
-    NodeData *lastNode;
-
-    int oldWayId;
-    double accumulatedDistance;
+private:
+    const OSMFragment&         m_frag;
+    NodeIndexMapType           m_nodeIndexMap;
+    boost::shared_ptr<OSMNode> m_dest;
+    
 public:
-    GraphBuilder( SimpleDBWrapper &db );
+    typedef VertexType Vertex;
 
-    void makeEdge( VertexType from, VertexType to );
+    DistanceHeuristic(
+        const OSMFragment &frag,
+        NodeIndexMapType nodeIndexMap,
+        VertexType dest ) :
+        m_frag( frag ),
+        m_nodeIndexMap( nodeIndexMap )
+    {
+        m_dest = getNode( dest );
+    }
 
-    void addNodeCallBack( int argc, char **argv, char **azColName );
-    void addNodeWayCallBack( int argc, char **argv, char **azColName );
+    boost::shared_ptr<OSMNode> getNode( Vertex v )
+    {
+        boost::uint64_t nodeId = m_nodeIndexMap[v];
 
-    GraphType &getGraph() { return g; }
-    DistReturnType distFrom( int startNode );
-    DistReturnType routeFrom( int startNode, int endNode );
+        OSMFragment::nodeMap_t::const_iterator findIt = m_frag.getNodes().find( nodeId );
+        if ( findIt == m_frag.getNodes().end() )
+        {
+            throw modosmapi::ModException( "Node not found in node map" );
+        }
 
-    ~GraphBuilder();
+        return findIt->second;
+    }
+
+    double operator()( Vertex v )
+    {
+        boost::shared_ptr<OSMNode> theNode = getNode( v );
+
+        return distBetween( m_dest->getLat(), m_dest->getLon(), theNode->getLat(), theNode->getLon() );
+    }
 };
 
-// GraphBuilder::GraphBuilder( SimpleDBWrapper &db ) : lastNode( NULL ), oldWayId( -1 ), accumulatedDistance( 0.0 )
-// {
-//     string query;
+// Class for A* visitor to throw once the destination is reached
+struct FoundGoalException {};
 
-//     // Pull in all the node data    
-//     query  = "select nodes.id as nodeid, lat, lon, count(wayid) as count from nodes ";
-//     query += "inner join nodesinways on nodes.id=nodesinways.nodeid group by nodeid";
-//     db.runQuery( query, boost::bind( &GraphBuilder::addNodeCallBack, this, _1, _2, _3 ) );
-    
-//     // Connect all the important nodes up
-//     query = "select wayid, nodeid from nodesinways order by wayid, id";
-//     db.runQuery( query, boost::bind( &GraphBuilder::addNodeWayCallBack, this, _1, _2, _3 ) );
-// }
-
-// void GraphBuilder::addNodeCallBack( int argc, char **argv, char **azColName )
-// {
-//     NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, g );
-
-//     int nodeId = boost::lexical_cast<int>( argv[0] );
-//     double lat = boost::lexical_cast<double>( argv[1] );
-//     double lon = boost::lexical_cast<double>( argv[2] );
-//     int count = boost::lexical_cast<int>( argv[3] );
-
-//     VertexType v = boost::add_vertex( g );
-//     nodeIndexMap[v] = nodeId;
-
-//     NodeData *n = new NodeData( nodeId, lat, lon, count, v );
-//     idToNodeMap[nodeId] = n;
-// }
-
-void GraphBuilder::makeEdge( VertexType from, VertexType to )
+class AStarVisitor : public boost::default_astar_visitor
 {
-    EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, g );
+private:
+    VertexType m_dest;
 
-    bool inserted;
-    EdgeType thisEdge;
-    boost::tie(thisEdge, inserted) = boost::add_edge( from, to, g );
-    edgeWeightMap[thisEdge] = accumulatedDistance;
-    boost::tie(thisEdge, inserted) = boost::add_edge( to, from, g );
-    edgeWeightMap[thisEdge] = accumulatedDistance;
-    accumulatedDistance = 0.0;
-}
-
-void GraphBuilder::addNodeWayCallBack( int argc, char **argv, char **azColName )
-{
-    int nodeId = boost::lexical_cast<int>( argv[1] );
-    int wayId = boost::lexical_cast<int>( argv[0] );
-
-    if ( idToNodeMap.find( nodeId ) != idToNodeMap.end() )
+public:
+    AStarVisitor( VertexType dest ) :m_dest( dest )
     {
-        NodeData *thisNode = idToNodeMap[nodeId];
-        if ( wayId == oldWayId )
-        {
-            accumulatedDistance += lastNode->distanceFrom( *thisNode );
-            if ( thisNode->inNumWays > 1 )
-            {
-                makeEdge( lastVertex, thisNode->v );
-                lastVertex = thisNode->v;
-            }
-        }
-        else 
-        {
-            if ( oldWayId != -1 )
-            {
-                makeEdge( lastVertex, lastNode->v );
-            }
-            lastVertex = thisNode->v;
-        }
-        oldWayId = wayId;
-        lastNode = thisNode;
-    }
-}
-
-
-DistReturnType GraphBuilder::distFrom( int startNode )
-{
-    EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, g );
-    NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, g );
-
-    VertexType start = idToNodeMap[startNode]->v;
-
-    std::vector<VertexType> p( boost::num_vertices(g) );
-    std::vector<double> d( boost::num_vertices(g) );
-    
-    boost::dijkstra_shortest_paths( g, start, boost::predecessor_map( &p[0] ).distance_map( &d[0] ) );
-
-    vector<pair<int, double> > c;
-    boost::graph_traits <GraphType>::vertex_iterator vi, vend;
-    for ( boost::tie(vi, vend) = vertices(g); vi != vend; ++vi)
-    {
-        int nodeId = nodeIndexMap[*vi];
-        double distance = d[*vi];
-
-        if ( distance < 100000.0 )
-        {
-            c.push_back( make_pair( nodeId, distance ) );
-        }
     }
 
-    return DistReturnType( c );
-}
-
-DistReturnType GraphBuilder::routeFrom( int startNode, int endNode )
-{
-    EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, g );
-    NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, g );
-
-    VertexType start = idToNodeMap[startNode]->v;
-    VertexType end = idToNodeMap[endNode]->v;
-
-    std::vector<VertexType> p( boost::num_vertices(g) );
-    std::vector<double> d( boost::num_vertices(g) );
-
-    boost::dijkstra_shortest_paths( g, start, boost::predecessor_map( &p[0] ).distance_map( &d[0] ) );
-
-    vector<pair<int, double> > nodePathList;
-
-    VertexType iter = end;
-    while ( iter != start )
+    void examine_vertex( VertexType u, const GraphType &g )
     {
-        int nodeId = nodeIndexMap[iter];
-        double distance = d[iter];
+        if ( u == m_dest )
+        {
+            throw FoundGoalException();
+        }
+    }
+};
 
-        nodePathList.push_back( make_pair( nodeId, distance ) );
+class RoutingGraph
+{
+    /* Member data */
+    /***************/
+private:
+    const OSMFragment&       m_frag;
+    nodeIdToVertexMap_t      m_nodeIdToVertexMap;
+    GraphType                m_graph;
+    std::vector<std::string> m_routeWayKeys;
+
+public:
+    RoutingGraph( const OSMFragment &frag ) : m_frag( frag )
+    {
+        // TODO: We may want to fill these from a config file (not that likely to change though...)
+        m_routeWayKeys.push_back( "highway" );
+        m_routeWayKeys.push_back( "cycleway" );
+        m_routeWayKeys.push_back( "tracktype" );
+    }
+
+    VertexType getVertex( boost::uint64_t nodeId )
+    {
+        nodeIdToVertexMap_t::const_iterator findIt = m_nodeIdToVertexMap.find( nodeId );
         
-        iter = p[iter];
+        if ( findIt == m_nodeIdToVertexMap.end() )
+        {
+            VertexType v = boost::add_vertex( m_graph );
+            m_nodeIdToVertexMap.insert( std::make_pair( nodeId, v ) );
+
+            NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, m_graph );
+            nodeIndexMap[v] = nodeId;
+
+            return v;
+        }
+        else
+        {
+            return findIt->second;
+        }
     }
-    nodePathList.push_back( make_pair( nodeIndexMap[start], 0.0 ) );
-
-    return DistReturnType( nodePathList );
-}
-
-GraphBuilder::~GraphBuilder()
-{
-    // Delete the temporary structure
-    typedef pair<int, NodeData *> p_t;
-    BOOST_FOREACH( p_t p, idToNodeMap )
-    {
-        delete p.second;
-    }
-}
-
-
-class Tester
-{
-    SimpleDBWrapper db;
-    GraphBuilder gb;
-    boost::graph_traits<GraphType>::edge_iterator it, endIt;
-public:
-    Tester() : db( "mapdata/oxtestdata.db" ), gb( db )
-    {
-        tie( it, endIt ) = boost::edges( gb.getGraph() );
-    }
-
-    bool end() { return it == endIt; }
     
-    pair<int, int> get()
+    bool validRoutingWay( const boost::shared_ptr<OSMWay> &way )
     {
-        NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, gb.getGraph() );
+        const tagMap_t &tags = way->getTags();
 
-        return make_pair(
-            nodeIndexMap[ boost::source( *it, gb.getGraph() ) ],
-            nodeIndexMap[ boost::target( *it, gb.getGraph() ) ] );
+        BOOST_FOREACH( const std::string &routeWayKey, m_routeWayKeys )
+        {
+            if ( tags.find( routeWayKey ) != tags.end() )
+            {
+                return true;
+            }
+            return false;
+        }
+    }
+    
+    void build()
+    {
+        // First pass: count the number of ways each node belongs to
+        typedef std::map<boost::uint64_t, size_t> nodeCountInWays_t;
+        nodeCountInWays_t nodeCountInWays;
+        BOOST_FOREACH( const OSMFragment::wayMap_t::value_type &v, m_frag.getWays() )
+        {
+            const boost::shared_ptr<OSMWay> &way = v.second;
+            if ( validRoutingWay( way ) )
+            {
+                BOOST_FOREACH( boost::uint64_t nodeId, way->getNodes() )
+                {
+                    nodeCountInWays[nodeId]++;
+                }
+
+                // Add one to the start and end nodes as they must feature in the routing graph
+                nodeCountInWays[way->getNodes().front()]++;
+                nodeCountInWays[way->getNodes().back()]++;
+            }
+        }
+        
+        EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, m_graph );
+        // Make a routing graph edge for each relevant section of each way
+        const OSMFragment::nodeMap_t &nodeMap = m_frag.getNodes();
+        BOOST_FOREACH( const OSMFragment::wayMap_t::value_type &v, m_frag.getWays() )
+        {
+            const boost::shared_ptr<OSMWay> &way = v.second;
+            if ( validRoutingWay( way ) )
+            {
+                VertexType lastRouteVertex;
+                boost::shared_ptr<OSMNode> lastNode;
+                double cumulativeDistance= 0.0;
+                BOOST_FOREACH( boost::uint64_t nodeId, way->getNodes() )
+                {
+                    const OSMFragment::nodeMap_t::const_iterator nFindIt = nodeMap.find( nodeId );
+                    if ( nFindIt == nodeMap.end() )
+                    {
+                        throw modosmapi::ModException( "Node not found in node map" );
+                    }
+                    boost::shared_ptr<OSMNode> thisNode = nFindIt->second;
+                    
+                    if ( nodeCountInWays[nodeId] > 1 )
+                    {
+                        // Make this vertex and add it to the map
+                        VertexType thisVertex = getVertex( nodeId );
+                        
+                        if ( lastRouteVertex )
+                        {
+                            // Returns a pair: Edge descriptor, bool (true if edge added)
+                            EdgeType thisEdge;
+                            bool successfulInsert;
+                            boost::tie( thisEdge, successfulInsert ) = boost::add_edge( lastRouteVertex, thisVertex, m_graph );
+                            edgeWeightMap[thisEdge] = cumulativeDistance;
+                        }
+                        
+                        lastRouteVertex = thisVertex;
+                        cumulativeDistance = 0.0;
+                    }
+                    else
+                    {
+                        cumulativeDistance += distBetween(
+                            lastNode->getLat(),
+                            lastNode->getLon(),
+                            thisNode->getLat(),
+                            thisNode->getLon() );
+                    }
+
+                    lastNode = thisNode;
+                }
+            }
+        }
     }
 
-    void next() { it++; }
+        // Assumes both nodes exists in the routing graph
+    void calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, std::list<boost::uint64_t> &route )
+    {
+        // Get the begin and end vertices
+        nodeIdToVertexMap_t::const_iterator findIt;
+        
+        findIt = m_nodeIdToVertexMap.find( sourceNodeId );
+        if ( findIt == m_nodeIdToVertexMap.end() )
+        {
+            throw modosmapi::ModException( "Source node id not vertex map" );
+        }
+        VertexType sourceVertex = findIt->second;
 
-    DistReturnType distFrom( int nodeId ) { return gb.distFrom( nodeId ); }
-    DistReturnType routeFrom( int startNode, int endNode ) { return gb.routeFrom( startNode, endNode ); }
+        findIt = m_nodeIdToVertexMap.find( destNodeId );
+        if ( findIt == m_nodeIdToVertexMap.end() )
+        {
+            throw modosmapi::ModException( "Dest node id not vertex map" );
+        }
+        VertexType destVertex = findIt->second;
+
+        NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, m_graph );
+        std::vector<VertexType> p( num_vertices( m_graph ) );
+        std::vector<double> d( num_vertices( m_graph ) );
+        try
+        {
+            astar_search( m_graph, sourceVertex,
+                          DistanceHeuristic( m_frag, nodeIndexMap, destVertex ),
+                          boost::predecessor_map( &p[0] ).
+                          distance_map( &d[0] ).
+                          visitor( AStarVisitor( destVertex ) ) );
+        }
+        catch ( FoundGoalException &e )
+        {
+            // End of route - we've reached the destination
+            for ( VertexType v = destVertex; ; v = p[v] )
+            {
+                NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, m_graph );
+                boost::uint64_t nodeId = nodeIndexMap[v];
+                route.push_front( nodeId );
+
+                if ( p[v] == v )
+                {
+                    break;
+                }
+            }
+        }
+        
+    }
+
 };
-
-BOOST_PYTHON_MODULE( Tester )
-{
-    class_<Tester>( "Tester" )
-        .def( "end", &Tester::end )
-        .def( "get", &Tester::get )
-        .def( "next", &Tester::next )
-        .def( "distFrom", &Tester::distFrom )
-        .def( "routeFrom", &Tester::routeFrom );
-
-    class_<pair<int, int> >( "IntEdgePair" )
-        .def_readonly( "first", &pair<int, int>::first )
-        .def_readonly( "second", &pair<int, int>::second );
-
-    class_<pair<int, double> >( "NodeDistPair" )
-        .def_readonly( "nodeid", &pair<int, double>::first )
-        .def_readonly( "dist", &pair<int, double>::second );
-
-    class_<DistReturnType>( "DistInfo", no_init )
-        .def( "end", &DistReturnType::end )
-        .def( "next", &DistReturnType::next )
-        .def( "get", &DistReturnType::get );
-}
-
-
-/*int main( int argc, char **argv )
-{
-    SimpleDBWrapper db( "mapdata/oxtestdata.db" );
-
-    GraphBuilder gb( db );
-
-    int startNode = boost::lexical_cast<int>( argv[1] );
-    int endNode = boost::lexical_cast<int>( argv[2] );
-
-    gb.findRoute( startNode, endNode );
-}*/
-
-
-#endif

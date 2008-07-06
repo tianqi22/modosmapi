@@ -30,24 +30,10 @@ using namespace boost::assign;
 #include <mysql/mysql.h>
 
 #include "engine.hpp"
+#include "exceptions.hpp"
 
-class ModuleException
+namespace modosmapi
 {
-private:
-    // TODO: Yes yes - I know this shoudn't use a std::string
-    // because its methods might throw. But I'm feeling lazy...
-    std::string m_message;
-
-public:
-    ModuleException( const std::string message ) : m_message( message )
-    {
-    }
-
-    const std::string &getMessage() const
-    {
-        return m_message;
-    }
-};
 
 struct ApachePageWriteSink
 {
@@ -79,7 +65,7 @@ void modAssert( bool predicate, std::string message )
 {
     if ( !predicate )
     {
-        throw ModuleException( boost::str( boost::format( "Module failed: %s" ) % message ) );
+        throw ModException( boost::str( boost::format( "Module failed: %s" ) % message ) );
     }
 }
 
@@ -162,19 +148,16 @@ int mapQuery( apacheStream_t &as, const std::vector<std::string> &pathComponents
         modosmapi::Context c;
         modosmapi::map (as, c, params[1], params[3], params[0], params[2]);
     }
-    catch (...)
+    catch ( std::exception &e )
     {
-        modAssert( false, "Map query code failed - threw an exception" );
+        std::cerr << "Map query failed: " << e.what() << std::endl;
+        modAssert( false, std::string( "Map query code failed: " ) + e.what() );
     }
 
     return OK;
 }
 
-
-
-extern "C"
-{
-    static int osm_handler(request_rec* r)
+static int osm_handler(request_rec* r)
     {
         if (!r->handler || strcmp(r->handler, "osm"))
             return DECLINED;
@@ -230,23 +213,21 @@ extern "C"
 
             return runQuery( as, pathComponents, queryKVPairs );
         }
-        catch ( const ModuleException &m )
-        {
-            as << m.getMessage();
-
-            return OK;
-        }
         catch ( const std::exception &e )
         {
-            as << "Unidentified std::exception thrown";
+            as << "Exception thrown: " << e.what();
             
             return OK;
         }
     }
 
+}
+
+extern "C"
+{
     static void register_hooks(apr_pool_t* pool)
     {
-        ap_hook_handler(osm_handler, NULL, NULL, APR_HOOK_MIDDLE);
+        ap_hook_handler(modosmapi::osm_handler, NULL, NULL, APR_HOOK_MIDDLE);
     }
 
     module AP_MODULE_DECLARE_DATA osm_module = {

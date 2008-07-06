@@ -25,8 +25,6 @@
 
 #include <mysql/mysql.h>
 
-
-
 // <host>/api/0.5select * from relation_tags inner join relations on relations.id=relation_tags.id inner join relation_members on relations.id=relation_members.id where member_id=4221467 and member_type='way'
 //
 // Creation:  PUT <objtype>/create + xml - returns id
@@ -260,14 +258,13 @@ void MapQueryGen::outputWay( const wayData_t &wayData )
 {
     boost::uint64_t wayId = wayData.get<0>();
     
-    const std::string wayAttrNames[] = { "id", "visible", "timestamp", "user" };
+    const std::string wayAttrNames[] = { "id", "visible", "timestamp" };
     
     m_out << xml::indent << "<way " << xml::attrs (wayAttrNames,
         boost::make_tuple(
             wayData.get<0>(),
             wayData.get<1>(),
-            boost::posix_time::to_iso_extended_string( wayData.get<2>() ) + "+00:00",
-            wayData.get<3>() ) ) << ">\n";
+            boost::posix_time::to_iso_extended_string( wayData.get<2>() ) + "+00:00" ) ) << ">\n";
     
     m_out << xml::inc;
     
@@ -295,16 +292,14 @@ void MapQueryGen::outputWay( const wayData_t &wayData )
 }
 
 void MapQueryGen::outputRelation( const relationData_t &relation )
-{
-    
-    const std::string relationTagNames[] = { "id", "visible", "timestamp", "user" };
+{    
+    const std::string relationTagNames[] = { "id", "visible", "timestamp" };
     m_out << xml::indent << "<relation " << xml::attrs(
         relationTagNames,
         boost::make_tuple(
             relation.get<0>(),
             relation.get<1>(),
-            boost::posix_time::to_iso_extended_string( relation.get<2>() ) + "+00:00",
-            relation.get<3>() ) ) << ">\n";
+            boost::posix_time::to_iso_extended_string( relation.get<2>() ) + "+00:00" ) ) << ">\n";
     
     m_out << xml::inc;
     
