@@ -43,10 +43,16 @@ typedef boost::graph_traits<GraphType>::edge_descriptor EdgeType;
 typedef boost::property_map<GraphType, boost::edge_weight_t>::type EdgeWeightMapType;
 typedef boost::property_map<GraphType, boost::vertex_name_t>::type NodeIndexMapType;
 
+// Tag: key, value, length multiplier. Can have +inf
+typedef boost::tuple<std::string, std::string, double> wayWeighting_t;
+typedef std::vector<wayWeighting_t> wayWeightings_t;
+
 struct WeightMapLookup
 {
-    GraphType &m_g;
-    std::vector<double> m_lengths;
+    GraphType&                                     m_g;
+    const std::vector<boost::shared_ptr<OSMWay> >& m_edgeWays;
+    const std::vector<double>&                     m_lengths;
+    wayWeightings_t                                m_wayWeightings;
 
 public:
     typedef EdgeType key_type;
@@ -54,7 +60,11 @@ public:
     typedef double&  reference;
     typedef boost::lvalue_property_map_tag category;
 
-    WeightMapLookup( GraphType &g, std::vector<double> lengths );
+    WeightMapLookup(
+        GraphType &g,
+        const std::vector<boost::shared_ptr<OSMWay> > &edgeWays,
+        const std::vector<double>& lengths,
+        wayWeightings_t wayWeightings );
     double get( EdgeType e ) const;
 };
 
@@ -97,7 +107,9 @@ private:
     const OSMFragment&                      m_frag;
     nodeIdToVertexMap_t                     m_nodeIdToVertexMap;
     GraphType                               m_graph;
-    std::vector<std::string>                m_routeWayKeys;
+
+    std::vector<std::string>                m_routableWayKeys;
+    wayWeightings_t                         m_wayWeightings;
 
     size_t                                  m_nextEdgeId;
     std::vector<double>                     m_edgeLengths;
@@ -113,8 +125,39 @@ public:
 };
 
 
-WeightMapLookup::WeightMapLookup( GraphType &g, std::vector<double> lengths ) : m_g( g ), m_lengths( lengths )
+WeightMapLookup::WeightMapLookup(
+    GraphType &g,
+    const std::vector<boost::shared_ptr<OSMWay> > &edgeWays,
+    const std::vector<double>& lengths,
+    wayWeightings_t wayWeightings ) :
+    m_g( g ), m_edgeWays( edgeWays ), m_lengths( lengths ), m_wayWeightings( wayWeightings )
 {
+}
+
+
+// TODO: This is really very inefficient. Probably want to pre-calculate a set of weights,
+//       perhaps on request in a queue
+double calculateWayWeight( boost::shared_ptr<OSMWay> theWay, const wayWeightings_t &wayWeightings )
+{
+    const tagMap_t &wayTags = theWay->getTags();
+    BOOST_FOREACH( const wayWeighting_t &weightTuple, wayWeightings )
+    {
+        std::string key, value;
+        double weight;
+
+        boost::tie( key, value, weight ) = weightTuple;
+
+        tagMap_t::const_iterator findIt = wayTags.find( key );
+        if ( findIt != wayTags.end() )
+        {
+            if ( findIt->second == value )
+            {
+                return weight;
+            }
+        }
+    }
+    
+    return 1.0;
 }
 
 double WeightMapLookup::get( EdgeType e ) const
@@ -123,8 +166,12 @@ double WeightMapLookup::get( EdgeType e ) const
     EdgeIdMap_t edgeIds = boost::get( boost::edge_index, m_g );
     
     size_t edgeIndex = edgeIds[e];
-    
-    return m_lengths[edgeIndex];
+
+    boost::shared_ptr<OSMWay> theWay = m_edgeWays.at( edgeIndex );
+
+    double wayWeight = calculateWayWeight( theWay, m_wayWeightings );
+
+    return m_lengths.at(edgeIndex) * wayWeight;
 }
 
 double get( const WeightMapLookup &m, EdgeType e )
@@ -178,9 +225,36 @@ void AStarVisitor::examine_vertex( VertexType u, const GraphType &g )
 RoutingGraph::RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
 {
     // TODO: We may want to fill these from a config file (not that likely to change though...)
-    m_routeWayKeys.push_back( "highway" );
-    m_routeWayKeys.push_back( "cycleway" );
-    m_routeWayKeys.push_back( "tracktype" );
+    m_routableWayKeys.push_back( "highway" );
+    m_routableWayKeys.push_back( "cycleway" );
+    m_routableWayKeys.push_back( "tracktype" );
+
+    // Edge weightings for cycling. In order of precedence
+    m_wayWeightings.push_back( boost::make_tuple( "cycleway", "track", 0.8 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "track", 0.8 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "cycleway", 0.8 ) );
+
+    m_wayWeightings.push_back( boost::make_tuple( "bicycle", "yes", 1.0 ) );
+
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "bridleway", 0.9 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "byway", 0.9 ) );
+    
+    m_wayWeightings.push_back( boost::make_tuple( "tracktype", "grade1", 0.8 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "tracktype", "grade2", 0.8 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "tracktype", "grade3", 1.0 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "tracktype", "grade4", 1.1 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "tracktype", "grade5", 1.2 ) );
+
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "trunk", 1.3 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "trunk_link", 1.3 ) );
+    
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "steps", 1.5 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "pedestrian", 1.5 ) );
+    m_wayWeightings.push_back(boost::make_tuple(  "highway", "pedestrian", 1.5 ) );
+
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway_link", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "bus_guideway", std::numeric_limits<double>::infinity() ) );
 }
 
 VertexType RoutingGraph::getVertex( boost::uint64_t nodeId )
@@ -222,9 +296,9 @@ bool RoutingGraph::validRoutingWay( const boost::shared_ptr<OSMWay> &way )
 {
     const tagMap_t &tags = way->getTags();
 
-    BOOST_FOREACH( const std::string &routeWayKey, m_routeWayKeys )
+    BOOST_FOREACH( const std::string &routableWayKey, m_routableWayKeys )
     {
-        if ( tags.find( routeWayKey ) != tags.end() )
+        if ( tags.find( routableWayKey ) != tags.end() )
         {
             return true;
         }
@@ -327,7 +401,7 @@ void RoutingGraph::calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t
     std::vector<VertexType> p( num_vertices( m_graph ) );
     std::vector<double> d( num_vertices( m_graph ) );        
 
-    WeightMapLookup wml( m_graph, m_edgeLengths );
+    WeightMapLookup wml( m_graph, m_edgeWays, m_edgeLengths, m_wayWeightings );
 
     try
     {
