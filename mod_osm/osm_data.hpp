@@ -100,10 +100,10 @@ public:
 class OSMWay : public OSMBase
 {
 private:
-    bool               m_visible;
+    bool                m_visible;
 
-    std::set<dbId_t>   m_nodes;
-    tagMap_t           m_tags;
+    std::vector<dbId_t> m_nodes;
+    tagMap_t            m_tags;
 
 public:
     OSMWay( OSMFragment &frag, XMLNodeData &data );
@@ -112,7 +112,7 @@ public:
 
     bool getVisible() const { return m_visible; }
 
-    const std::set<dbId_t> &getNodes() const { return m_nodes; }
+    const std::vector<dbId_t> &getNodes() const { return m_nodes; }
     const tagMap_t &getTags() const { return m_tags; }
 };
 

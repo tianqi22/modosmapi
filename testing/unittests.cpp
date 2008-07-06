@@ -148,9 +148,9 @@ void testDbHandler()
 
          db.executeNoResult( "DROP TABLE test_temp2" );
     }
-    catch( modosmapi::SqlException &e )
+    catch( std::exception &e )
     {
-        BOOST_FAIL( std::string( "Exception thrown with message: " ) + e.getMessage() );
+        BOOST_FAIL( std::string( "Exception thrown with message: " ) + e.what() );
     }
 }
 

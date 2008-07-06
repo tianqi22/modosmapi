@@ -11,12 +11,12 @@ namespace modosmapi
     {
         if ( !m_row || !m_res )
         {
-            throw SqlException( "Calling getField on empty row. Is query empty or exhausted?" );
+            throw ModException( "Calling getField on empty row. Is query empty or exhausted?" );
         }
 
         if ( index > mysql_num_fields( m_res ) )
         {
-            throw SqlException( "Index greater than number of fields" );
+            throw ModException( "Index greater than number of fields" );
         }
         return boost::lexical_cast<T>( m_row[index] );
     }
@@ -43,17 +43,17 @@ namespace modosmapi
         MYSQL_STMT *ps = mysql_stmt_init( &m_dbconn );
         if ( !ps )
         {
-            throw SqlException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
         }
 
         if ( mysql_stmt_prepare( ps, query.c_str(), query.size() ) )
         {
-            throw SqlException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
         }
 
         if ( mysql_stmt_execute( ps ) )
         {
-            throw SqlException( "Query execution failed" );
+            throw ModException( "Query execution failed" );
         }
 
         BindArgDataHolder dh( &m_dbconn, ps );
@@ -86,12 +86,12 @@ namespace modosmapi
         MYSQL_STMT *ps = mysql_stmt_init( &m_dbconn );
         if ( !ps )
         {
-            throw SqlException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Statement init failed: " ) + mysql_error( &m_dbconn ) );
         }
     
         if ( mysql_stmt_prepare( ps, query.c_str(), query.size() ) )
         {
-            throw SqlException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Statement prepare failed: " ) + mysql_error( &m_dbconn ) );
         }
 
 
@@ -105,7 +105,7 @@ namespace modosmapi
 
             if ( mysql_stmt_execute( ps ) )
             {
-                throw SqlException( std::string( "Statement execute failed: " ) + mysql_error( &m_dbconn ) );
+                throw ModException( std::string( "Statement execute failed: " ) + mysql_error( &m_dbconn ) );
             }
         }
 

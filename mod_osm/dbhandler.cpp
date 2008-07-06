@@ -142,7 +142,7 @@ namespace modosmapi
         // TODO: Make sure this doesn't exceed the buffer size
         if ( value.size() >= stringBufferSize )
         {
-            throw ;//std::exception( "String buffer size exceeded" );
+            throw ModException( "String buffer size exceeded" );
         }
         memcpy( arg.buffer, value.c_str(), value.size() );
         *arg.length = ((long unsigned int) value.size());
@@ -193,18 +193,18 @@ namespace modosmapi
     {
         if ( created )
         {
-            throw SqlException( "Single instance has already been created" );
+            throw ModException( "Single instance has already been created" );
         }
         created = true;
         
         if ( !mysql_init( &m_dbconn ) )
         {
-            throw SqlException( std::string( "Mysql init failure: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Mysql init failure: " ) + mysql_error( &m_dbconn ) );
         }
         
         if ( !mysql_real_connect( &m_dbconn, dbhost.c_str(), dbname.c_str(), dbuser.c_str(), dbpass.c_str(), 0, NULL, 0 ) )
         {
-            throw SqlException( std::string( "Mysql connection failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Mysql connection failed: " ) + mysql_error( &m_dbconn ) );
         }
     }
 
@@ -226,7 +226,7 @@ namespace modosmapi
 
         if ( mysql_query( &m_dbconn, query.c_str() ) )
         {
-            throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
         }    
     }
 
@@ -237,12 +237,12 @@ namespace modosmapi
 
         if ( mysql_query( &m_dbconn, query.c_str() ) )
         {
-            throw SqlException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Query failed: " ) + mysql_error( &m_dbconn ) );
         }
         
         if ( !(m_res=mysql_use_result( &m_dbconn )) )
         {
-            throw SqlException( std::string( "Result store failed: " ) + mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Result store failed: " ) + mysql_error( &m_dbconn ) );
         }
     }
 
@@ -250,7 +250,7 @@ namespace modosmapi
     {
         if ( !m_res )
         {
-            throw SqlException( "Cannot call next - no valid result" );
+            throw ModException( "Cannot call next - no valid result" );
         }
 
         m_row = mysql_fetch_row( m_res );
@@ -263,6 +263,8 @@ namespace modosmapi
         cleanUp();
 
         mysql_close( &m_dbconn );
+        
+        created = false;
     }
 
     /*static*/ bool DbConnection::created = false;

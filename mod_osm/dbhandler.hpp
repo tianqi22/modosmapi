@@ -14,19 +14,10 @@
 
 #include <mysql/mysql.h>
 
+#include "exceptions.hpp"
+
 namespace modosmapi
 {
-
-    class SqlException : public std::exception
-    {
-        std::string m_message;
-
-    public:
-        SqlException( const std::string &message ) : m_message( message ) { }
-        virtual ~SqlException() throw () {}
-        const std::string &getMessage() const { return m_message; }
-    };
-
     class BindArgDataHolder
     {
     private:
@@ -120,7 +111,7 @@ namespace modosmapi
         if ( mysql_stmt_bind_param( m_ps, m_args.get() ) )
         {
             std::cerr << "Param binding failed: " << mysql_error( m_dbConn ) << std::endl;
-            throw SqlException( std::string( "Param binding failed: " ) );//+ mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Param binding failed: " ) );//+ mysql_error( &m_dbconn ) );
         } 
     }
 
@@ -134,7 +125,7 @@ namespace modosmapi
 
         if ( mysql_stmt_bind_result( m_ps, m_args.get() ) )
         {       
-            throw SqlException( std::string( "Result binding failed: " ) );//+ mysql_error( &m_dbconn ) );
+            throw ModException( std::string( "Result binding failed: " ) );//+ mysql_error( &m_dbconn ) );
         } 
     }
 

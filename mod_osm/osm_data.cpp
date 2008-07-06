@@ -82,7 +82,7 @@ void OSMWay::readNd( XMLNodeData &data )
 {
     dbId_t ndId;
     data.readAttributes()( "ref", ndId );
-    m_nodes.insert( ndId );
+    m_nodes.push_back( ndId );
 }
 
 
