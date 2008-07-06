@@ -16,7 +16,8 @@ using namespace std;
 
 const double PI = acos( -1.0 );
 
-// Should return the distance in km between the two points: http://jan.ucc.nau.edu/~cvm/latlon_formula.html
+// Should return the distance in km between the two points
+// Ref: http://jan.ucc.nau.edu/~cvm/latlon_formula.html
 double distBetween( double lat1, double lon1, double lat2, double lon2 )
 {
     double a1 = (lat1 / 180.0) * PI;
@@ -34,13 +35,45 @@ typedef boost::adjacency_list<
     // Access to both input and output edges, in a directed graph
     boost::bidirectionalS,
     boost::property<boost::vertex_name_t, int>,
-    boost::property<boost::edge_weight_t, double> > GraphType;
+    boost::property<boost::edge_index_t, size_t> > GraphType;
 
 typedef boost::graph_traits<GraphType>::vertex_descriptor VertexType;
 typedef boost::graph_traits<GraphType>::edge_descriptor EdgeType;
 
 typedef boost::property_map<GraphType, boost::edge_weight_t>::type EdgeWeightMapType;
 typedef boost::property_map<GraphType, boost::vertex_name_t>::type NodeIndexMapType;
+
+struct WeightMapLookup
+{
+    GraphType &m_g;
+    std::vector<double> m_lengths;
+
+public:
+    typedef EdgeType key_type;
+    typedef double   value_type;
+    typedef double&  reference;
+    typedef boost::lvalue_property_map_tag category;
+
+    WeightMapLookup( GraphType &g, std::vector<double> lengths ) : m_g( g ), m_lengths( lengths )
+    {
+    }
+
+    double get( EdgeType e ) const
+    {
+        typedef boost::property_map<GraphType, boost::edge_index_t>::type EdgeIdMap_t;
+        EdgeIdMap_t edgeIds = boost::get( boost::edge_index, m_g );
+        
+        size_t edgeIndex = edgeIds[e];
+        
+        return m_lengths[edgeIndex];
+    }
+
+};
+
+double get( const WeightMapLookup &m, EdgeType e )
+{
+    return m.get( e );
+}
 
 
 typedef std::map<boost::uint64_t, VertexType> nodeIdToVertexMap_t;
@@ -113,13 +146,17 @@ class RoutingGraph
     /* Member data */
     /***************/
 private:
-    const OSMFragment&       m_frag;
-    nodeIdToVertexMap_t      m_nodeIdToVertexMap;
-    GraphType                m_graph;
-    std::vector<std::string> m_routeWayKeys;
+    const OSMFragment&                      m_frag;
+    nodeIdToVertexMap_t                     m_nodeIdToVertexMap;
+    GraphType                               m_graph;
+    std::vector<std::string>                m_routeWayKeys;
+
+    size_t                                  m_nextEdgeId;
+    std::vector<double>                     m_edgeLengths;
+    std::vector<boost::shared_ptr<OSMWay> > m_edgeWays;
 
 public:
-    RoutingGraph( const OSMFragment &frag ) : m_frag( frag )
+    RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
     {
         // TODO: We may want to fill these from a config file (not that likely to change though...)
         m_routeWayKeys.push_back( "highway" );
@@ -145,6 +182,20 @@ public:
         {
             return findIt->second;
         }
+    }
+
+    EdgeType addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way )
+    {
+        // Returns a pair: Edge descriptor, bool (true if edge added)
+        EdgeType thisEdge;
+        bool successfulInsert;
+        
+        boost::tie( thisEdge, successfulInsert ) = boost::add_edge( source, dest, m_nextEdgeId++, m_graph );
+
+        m_edgeLengths.push_back( length );
+        m_edgeWays.push_back( way );
+        
+        return thisEdge;
     }
     
     bool validRoutingWay( const boost::shared_ptr<OSMWay> &way )
@@ -182,7 +233,7 @@ public:
             }
         }
         
-        EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, m_graph );
+        //EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, m_graph );
         // Make a routing graph edge for each relevant section of each way
         const OSMFragment::nodeMap_t &nodeMap = m_frag.getNodes();
         BOOST_FOREACH( const OSMFragment::wayMap_t::value_type &v, m_frag.getWays() )
@@ -209,11 +260,7 @@ public:
                         
                         if ( lastRouteVertex )
                         {
-                            // Returns a pair: Edge descriptor, bool (true if edge added)
-                            EdgeType thisEdge;
-                            bool successfulInsert;
-                            boost::tie( thisEdge, successfulInsert ) = boost::add_edge( lastRouteVertex, thisVertex, m_graph );
-                            edgeWeightMap[thisEdge] = cumulativeDistance;
+                            addEdge( lastRouteVertex, thisVertex, cumulativeDistance, way );
                         }
                         
                         lastRouteVertex = thisVertex;
@@ -234,7 +281,7 @@ public:
         }
     }
 
-        // Assumes both nodes exists in the routing graph
+    // Assumes both nodes exists in the routing graph
     void calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, std::list<boost::uint64_t> &route )
     {
         // Get the begin and end vertices
@@ -256,14 +303,18 @@ public:
 
         NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, m_graph );
         std::vector<VertexType> p( num_vertices( m_graph ) );
-        std::vector<double> d( num_vertices( m_graph ) );
+        std::vector<double> d( num_vertices( m_graph ) );        
+
+        WeightMapLookup wml( m_graph, m_edgeLengths );
+
         try
         {
-            astar_search( m_graph, sourceVertex,
-                          DistanceHeuristic( m_frag, nodeIndexMap, destVertex ),
-                          boost::predecessor_map( &p[0] ).
-                          distance_map( &d[0] ).
-                          visitor( AStarVisitor( destVertex ) ) );
+             astar_search( m_graph, sourceVertex,
+                           DistanceHeuristic( m_frag, nodeIndexMap, destVertex ),
+                           boost::predecessor_map( &p[0] ).
+                           distance_map( &d[0] ).
+                           weight_map( wml ).
+                           visitor( AStarVisitor( destVertex ) ) );
         }
         catch ( FoundGoalException &e )
         {
