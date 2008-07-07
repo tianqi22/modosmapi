@@ -1,61 +1,6 @@
-#include <boost/tuple/tuple.hpp>
+#include "quadtree.hpp"
 
-#include <vector>
-
-
-
-template<typename CoordType, typename ValueType>
-class TreeMap
-{
-    class SplitStruct
-    {
-    public:
-        enum splitQuad_t
-        {
-            QUAD_TL = 0,
-            QUAD_TR = 1,
-            QUAD_BL = 2,
-            QUAD_BR = 3
-        };
-        
-    private:
-        CoordType m_xMid, m_yMid;
-        
-        // Width/height of a single quadrant (1/2 the total width/height)
-        CoordType m_width, m_height;
-        int m_depthIter;
-        
-    public:
-        SplitStruct( CoordType xMid, CoordType yMid, CoordType width, CoordType height, int depthIter );
-        splitQuad_t whichQuad( CoordType x, CoordType y ) const;
-        SplitStruct executeSplit( enum splitQuad_t ) const ;
-    };
-
-    class TMContBase
-    {
-    public:
-        virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val ) = 0;
-    };
-    
-    class TMVecContainer : TMContBase
-    {
-        std::vector<boost::tuple<CoordType, CoordType, ValueType> > m_values;
-    public:
-        virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val );
-    };
-    
-    class TMQuadContainer : TMContBase
-    {
-    public:
-        virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val );
-    };
-
-    SplitStruct     m_splitStruct;
-    TMQuadContainer m_container;
-public:
-    TreeMap( size_t depth, CoordType left, CoordType right, CoordType top, CoordType bottom );
-    void add( CoordType x, CoordType y, const ValueType &val );
-};
+#include <boost/foreach.hpp>
 
 template<typename CoordType, typename ValueType>
 TreeMap<CoordType, ValueType>::TreeMap( size_t depth, CoordType left, CoordType right, CoordType top, CoordType bottom )
@@ -71,7 +16,7 @@ TreeMap<CoordType, ValueType>::TreeMap( size_t depth, CoordType left, CoordType 
 template<typename CoordType, typename ValueType>
 void TreeMap<CoordType, ValueType>::add( CoordType x, CoordType y, const ValueType &val )
 {
-    // TODO
+    m_container.add( m_splitStruct, x, y, val );
 }
 
 template<typename CoordType, typename ValueType>
@@ -136,5 +81,31 @@ template<typename CoordType, typename ValueType>
     CoordType y,
     const ValueType &val )
 {
+    size_t thisDepth = s.m_depth;   
+    if ( m_quadrants.empty() )
+    {
+        for ( size_t i = 0; i < 4; i++ )
+        {
+            if ( thisDepth == 0 )
+            {
+                m_quadrants.push_back( new TMVecContainer() );
+            }
+            else
+            {
+                m_quadrants.push_back( new TMQuadContainer() );
+            }
+        }
+    }
+
+    typename SplitStruct::splitQuad_t theQuad = s.whichQuad( x, y );
+    m_quadrants.add( s.executeSplit( theQuad ), x, y, val );
 }
 
+template<typename CoordType, typename ValueType>
+/*virtual*/ TreeMap<CoordType, ValueType>::TMQuadContainer::~TMQuadContainer()
+{
+    BOOST_FOREACH( const TMContBase *el, m_quadrants )
+    {
+        delete el;
+    }
+}
