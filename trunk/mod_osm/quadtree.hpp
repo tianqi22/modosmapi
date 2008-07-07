@@ -1,10 +1,11 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/function.hpp>
 
 #include <vector>
 
 template<typename CoordType, typename ValueType>
-class TreeMap
+class QuadTree
 {
     class SplitStruct
     {
@@ -34,14 +35,28 @@ class TreeMap
     {
     public:
         virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val ) = 0;
+        virtual void visitRegion(
+            const SplitStruct &s,
+            CoordType xMin, CoordType xMax,
+            CoordType yMin, CoordType yMax,
+            boost::function<void( const ValueType & )> fn ) = 0;
+        
+        // TODO: If we want this, may need to change base container away from vector
+        //virtual void erase( const SplitStruct &s, CoordType x, CoordType y ) = 0;
         virtual ~TMContBase() {}
     };
     
     class TMVecContainer : TMContBase
     {
-        std::vector<boost::tuple<CoordType, CoordType, ValueType> > m_values;
+        typedef boost::tuple<CoordType, CoordType, ValueType> CoordEl_t;
+        std::vector<CoordEl_t> m_values;
     public:
         virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val );
+        virtual void visitRegion(
+            const SplitStruct &s,
+            CoordType xMin, CoordType xMax,
+            CoordType yMin, CoordType yMax,
+            boost::function<void( const ValueType & )> fn );
     };
     
     class TMQuadContainer : TMContBase
@@ -49,13 +64,22 @@ class TreeMap
         std::vector<TMContBase *> m_quadrants;
     public:
         virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val );
+        virtual void visitRegion(
+            const SplitStruct &s,
+            CoordType xMin, CoordType xMax,
+            CoordType yMin, CoordType yMax,
+            boost::function<void( const ValueType & )> fn );
         virtual ~TMQuadContainer();
     };
 
     SplitStruct     m_splitStruct;
     TMQuadContainer m_container;
 public:
-    TreeMap( size_t depth, CoordType left, CoordType right, CoordType top, CoordType bottom );
+    QuadTree( size_t depth, CoordType xMin, CoordType xMax, CoordType yMin, CoordType yMax );
     void add( CoordType x, CoordType y, const ValueType &val );
+    void visitRegion(
+        CoordType xMin, CoordType xMax,
+        CoordType yMin, CoordType yMax,
+        boost::function<void( const ValueType & )> fn );
 };
 
