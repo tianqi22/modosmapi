@@ -1,3 +1,6 @@
+#ifndef QUADTREE_H
+#define QUADTREE_H
+
 #include <boost/tuple/tuple.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
@@ -7,6 +10,9 @@
 template<typename CoordType, typename ValueType>
 class QuadTree
 {
+public:
+    typedef boost::function<void( CoordType x, CoordType y, const ValueType & )> visitFn_t;
+
     class SplitStruct
     {
     public:
@@ -23,12 +29,14 @@ class QuadTree
         
         // Width/height of a single quadrant (1/2 the total width/height)
         CoordType m_width, m_height;
-        int m_depthIter;
+        size_t m_depthIter;
         
     public:
-        SplitStruct( CoordType xMid, CoordType yMid, CoordType width, CoordType height, int depthIter );
+        SplitStruct() {}
+        SplitStruct( CoordType xMid, CoordType yMid, CoordType width, CoordType height, size_t depthIter );
         splitQuad_t whichQuad( CoordType x, CoordType y ) const;
-        SplitStruct executeSplit( enum splitQuad_t ) const ;
+        SplitStruct executeSplit( enum splitQuad_t ) const;
+        size_t getDepth() const { return m_depthIter; }
     };
 
     class TMContBase
@@ -39,27 +47,31 @@ class QuadTree
             const SplitStruct &s,
             CoordType xMin, CoordType xMax,
             CoordType yMin, CoordType yMax,
-            boost::function<void( const ValueType & )> fn ) = 0;
+            visitFn_t fn ) = 0;
         
         // TODO: If we want this, may need to change base container away from vector
         //virtual void erase( const SplitStruct &s, CoordType x, CoordType y ) = 0;
         virtual ~TMContBase() {}
     };
     
-    class TMVecContainer : TMContBase
+    class TMVecContainer : public TMContBase
     {
-        typedef boost::tuple<CoordType, CoordType, ValueType> CoordEl_t;
-        std::vector<CoordEl_t> m_values;
+    public:
+        typedef boost::tuple<CoordType, CoordType, ValueType> coordEl_t;
+
+    private:
+        std::vector<coordEl_t> m_values;
+
     public:
         virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val );
         virtual void visitRegion(
             const SplitStruct &s,
             CoordType xMin, CoordType xMax,
             CoordType yMin, CoordType yMax,
-            boost::function<void( const ValueType & )> fn );
+            visitFn_t fn );
     };
     
-    class TMQuadContainer : TMContBase
+    class TMQuadContainer : public TMContBase
     {
         std::vector<TMContBase *> m_quadrants;
     public:
@@ -68,7 +80,7 @@ class QuadTree
             const SplitStruct &s,
             CoordType xMin, CoordType xMax,
             CoordType yMin, CoordType yMax,
-            boost::function<void( const ValueType & )> fn );
+            visitFn_t fn );
         virtual ~TMQuadContainer();
     };
 
@@ -80,6 +92,10 @@ public:
     void visitRegion(
         CoordType xMin, CoordType xMax,
         CoordType yMin, CoordType yMax,
-        boost::function<void( const ValueType & )> fn );
+        visitFn_t fn );
 };
+
+#include "quadtree.ipp"
+
+#endif // QUADTREE_H
 
