@@ -1,8 +1,10 @@
 #include "xml_reader.hpp"
 #include "osm_data.hpp"
 #include "dbhandler.hpp"
+#include "quadtree.hpp"
 
 #include "engine.hpp"
+
 
 #include <string>
 #include <iostream>
@@ -11,6 +13,7 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/format.hpp>
+#include <boost/random.hpp>
 
 #include <boost/test/included/unit_test.hpp>
 #include <boost/test/floating_point_comparison.hpp>
@@ -227,19 +230,55 @@ void tempMapQuery()
     modosmapi::map( ofs, context, 51.7387, 51.7803, -1.3163, -0.4132 );
 }
 
+struct CountVisitor
+{
+    size_t m_count;
+    CountVisitor() : m_count( 0 )
+    {
+    }
+    
+    void operator()( double x, double y, const std::string &value )
+    {
+        m_count++;
+    }
+};
+
+
+void testQuadTree()
+{
+    QuadTree<double, std::string> qt( 7, -10.0, 10.0, -10.0, 10.0 );
+    boost::mt19937 rng;
+    boost::uniform_real<double> u( -10.0, 10.0 );
+
+    size_t countInRegion = 0;
+    for ( int i = 0; i < 1000; i++ )
+    {
+        double x = u( rng );
+        double y = u( rng );
+
+        qt.add( countInRegion, countInRegion, boost::str( boost::format( "insertion %d" ) % i ) );
+
+        if ( x > 4.0 && x < 9.0 && y > -3.0 && y < 7.0 )
+        {
+            countInRegion++;
+        }
+    }
+
+    CountVisitor cv;
+    qt.visitRegion( 4.0, 9.0, -3.0, 7.0, cv );
+    std::cout << "Number in region: " << countInRegion << std::endl;
+    std::cout << "Count in region: " << cv.m_count << std::endl;
+}
+
 
 boost::unit_test::test_suite* init_unit_test_suite( int argc, char **argv )
 {
     boost::unit_test::test_suite *test = BOOST_TEST_SUITE( "Master test suite" );
 
-    std::cout << "Here: " << std::endl;
-    std::cout << 3.141592654 << std::endl;
-    std::cout << std::fixed << std::setprecision(10);
-    std::cout << 3.141592565 << std::endl;
-
-    //test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
-    //test->add( BOOST_TEST_CASE( &testDbHandler ) );
-    test->add( BOOST_TEST_CASE( &tempMapQuery ) );
+    test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
+    test->add( BOOST_TEST_CASE( &testDbHandler ) );
+    test->add( BOOST_TEST_CASE( &testQuadTree ) );
+    //test->add( BOOST_TEST_CASE( &tempMapQuery ) );
     return test;
 }
 
