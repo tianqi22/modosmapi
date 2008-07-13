@@ -1,6 +1,32 @@
 
 #include <boost/foreach.hpp>
 
+
+template<typename CoordType>
+bool RectangularRegion<CoordType>::inRegion( const XYPoint<CoordType> &point ) const
+{
+    return point.m_x >= m_minMin.m_x && point.m_x <= m_maxMax.m_x &&
+           point.m_y >= m_minMin.m_y && point.m_y <= m_maxMax.m_y;
+}
+
+template<typename CoordType>
+bool RectangularRegion<CoordType>::overlaps( const RectangularRegion<CoordType> &rhs ) const
+{
+    // TODO: This can't be efficient, but it does the job for now
+    bool cornerlessOverlap =
+        m_minMin.m_x >= rhs.m_minMin.m_x && m_maxMax.m_x <= rhs.m_maxMax.m_x &&
+        m_minMin.m_y <= rhs.m_minMin.m_y && m_maxMax.m_y >= rhs.m_maxMax.m_y;
+
+    cornerlessOverlap |=
+        rhs.m_minMin.m_x >= m_minMin.m_x && rhs.m_maxMax.m_x <= m_maxMax.m_x &&
+        rhs.m_minMin.m_y <= m_minMin.m_y && rhs.m_maxMax.m_y >= m_maxMax.m_y;
+
+    return cornerlessOverlap ||
+           inRegion( rhs.m_minMin ) || inRegion( rhs.m_maxMax ) ||
+           rhs.inRegion( m_minMin ) || rhs.inRegion( m_maxMax );
+}
+
+
 template<typename CoordType, typename ValueType>
 QuadTree<CoordType, ValueType>::QuadTree( size_t depth, CoordType xMin, CoordType xMax, CoordType yMin, CoordType yMax )
 {
@@ -83,27 +109,6 @@ template<typename CoordType, typename ValueType>
     m_values.push_back( boost::make_tuple( x, y, val ) );
 }
 
-template<typename CoordType, typename ValueType>
-/*virtual*/ void QuadTree<CoordType, ValueType>::TMVecContainer::visitRegion(
-    const SplitStruct &s,
-    CoordType xMin, CoordType xMax,
-    CoordType yMin, CoordType yMax,
-    visitFn_t fn )
-{
-    typedef typename QuadTree<CoordType, ValueType>::TMVecContainer::coordEl_t coordEl_t;
-
-    BOOST_FOREACH( const coordEl_t &v, m_values )
-    {
-        CoordType x = v.template get<0>();
-        CoordType y = v.template get<1>();
-        const ValueType &val = v.template get<2>();
-        
-        if ( x >= xMin && x < xMax && y >= yMin && y < yMax )
-        {
-            fn( x, y, val );
-        }
-    }
-}
     
 template<typename CoordType, typename ValueType>
 /*virtual*/ void QuadTree<CoordType, ValueType>::TMQuadContainer::add(
@@ -133,13 +138,47 @@ template<typename CoordType, typename ValueType>
 }
 
 template<typename CoordType, typename ValueType>
+/*virtual*/ void QuadTree<CoordType, ValueType>::TMVecContainer::visitRegion(
+    const SplitStruct &s,
+    CoordType xMin, CoordType xMax,
+    CoordType yMin, CoordType yMax,
+    visitFn_t fn )
+{
+    std::cout << "Visiting vec container with: " << m_values.size() << std::endl;
+    typedef typename QuadTree<CoordType, ValueType>::TMVecContainer::coordEl_t coordEl_t;
+
+    BOOST_FOREACH( const coordEl_t &v, m_values )
+    {
+        CoordType x = v.template get<0>();
+        CoordType y = v.template get<1>();
+        const ValueType &val = v.template get<2>();
+        
+        if ( x >= xMin && x < xMax && y >= yMin && y < yMax )
+        {
+            fn( x, y, val );
+        }
+    }
+}
+
+
+template<typename CoordType, typename ValueType>
 /*virtual*/ void QuadTree<CoordType, ValueType>::TMQuadContainer::visitRegion(
     const SplitStruct &s,
     CoordType xMin, CoordType xMax,
     CoordType yMin, CoordType yMax,
     visitFn_t fn )
 {
-    // TODO: Get coords of each quad, then bounds check on each
+    std::cout << "Visiting a quad container" << std::endl;
+    if ( !m_quadrants.empty() )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            typename SplitStruct::splitQuad_t theQuad = (typename SplitStruct::splitQuad_t) i;
+
+            m_quadrants[i]->visitRegion( s.executeSplit( theQuad ),
+                xMin, xMax, yMin, yMax, fn );
+        }
+    }
 }
 
 template<typename CoordType, typename ValueType>

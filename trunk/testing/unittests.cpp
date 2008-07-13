@@ -244,6 +244,48 @@ struct CountVisitor
 };
 
 
+void testOverlaps()
+{
+    typedef RectangularRegion<double> rect_t;
+
+    rect_t A( 0.0, 0.0, 4.0, 4.0 );
+    rect_t B( 2.0, 2.0, 6.0, 6.0 );
+    rect_t C( 0.0, 2.0, 5.0, 4.0 );
+    rect_t D( 2.0, 0.0, 3.0, 6.0 );
+    rect_t E( 7.0, 0.0, 8.0, 6.0 );
+    rect_t F( 0.0, 5.0, 1.0, 6.0 );
+    rect_t G( 5.0, 0.0, 6.0, 5.0 );
+
+    BOOST_ASSERT( A.overlaps( B ) );
+    BOOST_ASSERT( B.overlaps( A ) );
+    BOOST_ASSERT( B.overlaps( G ) );
+    BOOST_ASSERT( G.overlaps( B ) );
+    BOOST_ASSERT( !A.overlaps( F ) );
+    BOOST_ASSERT( !F.overlaps( A ) );
+    BOOST_ASSERT( !B.overlaps( F ) );
+    BOOST_ASSERT( !F.overlaps( B ) );
+    BOOST_ASSERT( !A.overlaps( G ) );
+    BOOST_ASSERT( !G.overlaps( A ) );
+    BOOST_ASSERT( C.overlaps( D ) );
+    BOOST_ASSERT( D.overlaps( C ) );
+    BOOST_ASSERT( !D.overlaps( E ) );
+    BOOST_ASSERT( !E.overlaps( D ) );
+    BOOST_ASSERT( !C.overlaps( E ) );
+    BOOST_ASSERT( !E.overlaps( C ) );
+    BOOST_ASSERT( A.overlaps( D ) );
+    BOOST_ASSERT( D.overlaps( A ) );
+    BOOST_ASSERT( C.overlaps( A ) );
+    BOOST_ASSERT( A.overlaps( C ) );
+    BOOST_ASSERT( C.overlaps( B ) );
+    BOOST_ASSERT( B.overlaps( C ) );
+    BOOST_ASSERT( !F.overlaps( C ) );
+    BOOST_ASSERT( !C.overlaps( F ) );
+    BOOST_ASSERT( !F.overlaps( D ) );
+    BOOST_ASSERT( !D.overlaps( F ) );
+    BOOST_ASSERT( !G.overlaps( D ) );
+    BOOST_ASSERT( !D.overlaps( G ) );
+}
+
 void testQuadTree()
 {
     QuadTree<double, std::string> qt( 7, -10.0, 10.0, -10.0, 10.0 );
@@ -277,6 +319,7 @@ boost::unit_test::test_suite* init_unit_test_suite( int argc, char **argv )
 
     test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
     test->add( BOOST_TEST_CASE( &testDbHandler ) );
+    test->add( BOOST_TEST_CASE( &testOverlaps ) );
     test->add( BOOST_TEST_CASE( &testQuadTree ) );
     //test->add( BOOST_TEST_CASE( &tempMapQuery ) );
     return test;
