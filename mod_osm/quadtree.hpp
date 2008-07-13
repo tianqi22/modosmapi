@@ -7,6 +7,30 @@
 
 #include <vector>
 
+template<typename CoordType>
+struct XYPoint
+{
+    CoordType m_x, m_y;
+    
+    XYPoint( CoordType x, CoordType y ) : m_x( x ), m_y( y )
+    {
+    }
+};
+
+template<typename CoordType>
+struct RectangularRegion
+{
+    XYPoint<CoordType> m_minMin, m_maxMax;
+
+    bool inRegion( const XYPoint<CoordType> &point ) const;
+    bool overlaps( const RectangularRegion<CoordType> &rhs ) const;
+    
+    RectangularRegion( CoordType min_x, CoordType min_y, CoordType max_x, CoordType max_y ) :
+        m_minMin( min_x, min_y ), m_maxMax( max_x, max_y )
+    {
+    }
+};
+
 template<typename CoordType, typename ValueType>
 class QuadTree
 {
