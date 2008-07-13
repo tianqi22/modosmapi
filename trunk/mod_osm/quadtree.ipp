@@ -144,7 +144,7 @@ template<typename CoordType, typename ValueType>
     CoordType yMin, CoordType yMax,
     visitFn_t fn )
 {
-    std::cout << "Visiting vec container with: " << m_values.size() << std::endl;
+    //std::cout << "Visiting vec container with: " << m_values.size() << std::endl;
     typedef typename QuadTree<CoordType, ValueType>::TMVecContainer::coordEl_t coordEl_t;
 
     BOOST_FOREACH( const coordEl_t &v, m_values )
@@ -153,7 +153,7 @@ template<typename CoordType, typename ValueType>
         CoordType y = v.template get<1>();
         const ValueType &val = v.template get<2>();
         
-        if ( x >= xMin && x < xMax && y >= yMin && y < yMax )
+        if ( (x >= xMin) && (x < xMax) && (y >= yMin) && (y < yMax) )
         {
             fn( x, y, val );
         }
@@ -168,7 +168,7 @@ template<typename CoordType, typename ValueType>
     CoordType yMin, CoordType yMax,
     visitFn_t fn )
 {
-    std::cout << "Visiting a quad container" << std::endl;
+    //std::cout << "Visiting a quad container" << std::endl;
     if ( !m_quadrants.empty() )
     {
         for ( int i = 0; i < 4; i++ )

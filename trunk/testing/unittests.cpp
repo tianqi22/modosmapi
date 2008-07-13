@@ -298,7 +298,7 @@ void testQuadTree()
         double x = u( rng );
         double y = u( rng );
 
-        qt.add( countInRegion, countInRegion, boost::str( boost::format( "insertion %d" ) % i ) );
+        qt.add( x, y, boost::str( boost::format( "insertion %d" ) % i ) );
 
         if ( x > 4.0 && x < 9.0 && y > -3.0 && y < 7.0 )
         {
@@ -307,7 +307,7 @@ void testQuadTree()
     }
 
     CountVisitor cv;
-    qt.visitRegion( 4.0, 9.0, -3.0, 7.0, cv );
+    qt.visitRegion( 4.0, 9.0, -3.0, 7.0, boost::ref( cv ) );
     std::cout << "Number in region: " << countInRegion << std::endl;
     std::cout << "Count in region: " << cv.m_count << std::endl;
 }
