@@ -286,28 +286,61 @@ void testOverlaps()
     BOOST_ASSERT( !D.overlaps( G ) );
 }
 
+void testSplitStruct()
+{
+    typedef QuadTree<double, std::string>::SplitStruct splitStruct_t;
+    splitStruct_t s( 5.0, 5.0, 10.0, 7.0, 0 );
+
+    RectangularRegion<double> r0 = s.rectFor( splitStruct_t::QUAD_TL );
+    RectangularRegion<double> r1 = s.rectFor( splitStruct_t::QUAD_TR );
+    RectangularRegion<double> r2 = s.rectFor( splitStruct_t::QUAD_BL );
+    RectangularRegion<double> r3 = s.rectFor( splitStruct_t::QUAD_BR );
+
+    BOOST_CHECK_CLOSE( r0.m_minMin.m_x, -5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r0.m_minMin.m_y, -2.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r0.m_maxMax.m_x, 5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r0.m_maxMax.m_y, 5.0, 1e-15 );
+
+    BOOST_CHECK_CLOSE( r1.m_minMin.m_x, 5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r1.m_minMin.m_y, -2.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r1.m_maxMax.m_x, 15.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r1.m_maxMax.m_y, 5.0, 1e-15 );
+
+    BOOST_CHECK_CLOSE( r2.m_minMin.m_x, -5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r2.m_minMin.m_y, 5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r2.m_maxMax.m_x, 5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r2.m_maxMax.m_y, 12.0, 1e-15 );
+
+    BOOST_CHECK_CLOSE( r3.m_minMin.m_x, 5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r3.m_minMin.m_y, 5.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r3.m_maxMax.m_x, 15.0, 1e-15 );
+    BOOST_CHECK_CLOSE( r3.m_maxMax.m_y, 12.0, 1e-15 );
+}
+
 void testQuadTree()
 {
     QuadTree<double, std::string> qt( 7, -10.0, 10.0, -10.0, 10.0 );
     boost::mt19937 rng;
     boost::uniform_real<double> u( -10.0, 10.0 );
 
+    RectangularRegion<double> r( 4.0, -3.0, 9.0, 7.0 );
+
     size_t countInRegion = 0;
     for ( int i = 0; i < 1000; i++ )
     {
-        double x = u( rng );
-        double y = u( rng );
+        XYPoint<double> point( u(rng), u(rng) );
 
-        qt.add( x, y, boost::str( boost::format( "insertion %d" ) % i ) );
+        qt.add( point.m_x, point.m_y, boost::str( boost::format( "insertion %d" ) % i ) );
 
-        if ( x > 4.0 && x < 9.0 && y > -3.0 && y < 7.0 )
+        if ( r.inRegion( point ) )
         {
             countInRegion++;
         }
     }
 
     CountVisitor cv;
-    qt.visitRegion( 4.0, 9.0, -3.0, 7.0, boost::ref( cv ) );
+    
+    qt.visitRegion( r, boost::ref( cv ) );
     std::cout << "Number in region: " << countInRegion << std::endl;
     std::cout << "Count in region: " << cv.m_count << std::endl;
 }
@@ -319,6 +352,7 @@ boost::unit_test::test_suite* init_unit_test_suite( int argc, char **argv )
 
     test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
     test->add( BOOST_TEST_CASE( &testDbHandler ) );
+    test->add( BOOST_TEST_CASE( &testSplitStruct ) );
     test->add( BOOST_TEST_CASE( &testOverlaps ) );
     test->add( BOOST_TEST_CASE( &testQuadTree ) );
     //test->add( BOOST_TEST_CASE( &tempMapQuery ) );

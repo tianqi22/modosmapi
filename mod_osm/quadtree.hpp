@@ -48,7 +48,7 @@ public:
             QUAD_BR = 3
         };
         
-    private:
+    public:
         CoordType m_xMid, m_yMid;
         
         // Width/height of a single quadrant (1/2 the total width/height)
@@ -60,6 +60,7 @@ public:
         SplitStruct( CoordType xMid, CoordType yMid, CoordType width, CoordType height, size_t depthIter );
         splitQuad_t whichQuad( CoordType x, CoordType y ) const;
         SplitStruct executeSplit( enum splitQuad_t ) const;
+        RectangularRegion<CoordType> rectFor( enum splitQuad_t ) const;
         size_t getDepth() const { return m_depthIter; }
     };
 
@@ -69,8 +70,7 @@ public:
         virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val ) = 0;
         virtual void visitRegion(
             const SplitStruct &s,
-            CoordType xMin, CoordType xMax,
-            CoordType yMin, CoordType yMax,
+            const RectangularRegion<CoordType> &bounds,
             visitFn_t fn ) = 0;
         
         // TODO: If we want this, may need to change base container away from vector
@@ -90,8 +90,7 @@ public:
         virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val );
         virtual void visitRegion(
             const SplitStruct &s,
-            CoordType xMin, CoordType xMax,
-            CoordType yMin, CoordType yMax,
+            const RectangularRegion<CoordType> &bounds,
             visitFn_t fn );
     };
     
@@ -102,8 +101,7 @@ public:
         virtual void add( const SplitStruct &s, CoordType x, CoordType y, const ValueType &val );
         virtual void visitRegion(
             const SplitStruct &s,
-            CoordType xMin, CoordType xMax,
-            CoordType yMin, CoordType yMax,
+            const RectangularRegion<CoordType> &bounds,
             visitFn_t fn );
         virtual ~TMQuadContainer();
     };
@@ -113,10 +111,7 @@ public:
 public:
     QuadTree( size_t depth, CoordType xMin, CoordType xMax, CoordType yMin, CoordType yMax );
     void add( CoordType x, CoordType y, const ValueType &val );
-    void visitRegion(
-        CoordType xMin, CoordType xMax,
-        CoordType yMin, CoordType yMax,
-        visitFn_t fn );
+    void visitRegion( const RectangularRegion<CoordType> &bounds, visitFn_t fn );
 };
 
 #include "quadtree.ipp"
