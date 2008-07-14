@@ -15,6 +15,11 @@ struct XYPoint
     XYPoint( CoordType x, CoordType y ) : m_x( x ), m_y( y )
     {
     }
+
+    bool operator()( const XYPoint<CoordType> &rhs )
+    {
+        
+    }
 };
 
 template<typename CoordType>
