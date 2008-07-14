@@ -325,6 +325,8 @@ void testQuadTree()
 
     RectangularRegion<double> r( 4.0, -3.0, 9.0, 7.0 );
 
+    set<XYPoint<double> > found;
+
     size_t countInRegion = 0;
     for ( int i = 0; i < 1000; i++ )
     {
@@ -334,6 +336,7 @@ void testQuadTree()
 
         if ( r.inRegion( point ) )
         {
+            found.insert( point );
             countInRegion++;
         }
     }
