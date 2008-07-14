@@ -46,11 +46,10 @@ void QuadTree<CoordType, ValueType>::add( CoordType x, CoordType y, const ValueT
 
 template<typename CoordType, typename ValueType>
 void QuadTree<CoordType, ValueType>::visitRegion(
-    CoordType xMin, CoordType xMax,
-    CoordType yMin, CoordType yMax,
+    const RectangularRegion<CoordType> &bounds,
     boost::function<void( CoordType x, CoordType y, const ValueType & )> fn )
 {
-    m_container.visitRegion( m_splitStruct, xMin, xMax, yMin, yMax, fn );
+    m_container.visitRegion( m_splitStruct, bounds, fn );
 }
 
 template<typename CoordType, typename ValueType>
@@ -100,12 +99,48 @@ QuadTree<CoordType, ValueType>::SplitStruct::executeSplit( splitQuad_t quad ) co
 }
 
 template<typename CoordType, typename ValueType>
+RectangularRegion<CoordType> QuadTree<CoordType, ValueType>::SplitStruct::rectFor( splitQuad_t quad ) const
+{
+    double minX, maxX, minY, maxY;
+    
+    if ( quad & 1 ) 
+    {
+        minX = m_xMid;
+        maxX = m_xMid + m_width; 
+    }
+    else
+    {
+        minX = m_xMid - m_width;
+        maxX = m_xMid;
+    }
+
+    if ( quad & 2 )
+    {
+        minY = m_yMid;
+        maxY = m_yMid + m_height;
+    }
+    else
+    {
+        minY = m_yMid - m_height;
+        maxY = m_yMid;
+    }
+
+    return RectangularRegion<CoordType>( minX, minY, maxX, maxY );
+}
+
+template<typename CoordType, typename ValueType>
 /*virtual*/ void QuadTree<CoordType, ValueType>::TMVecContainer::add(
     const SplitStruct &s,
     CoordType x,
     CoordType y,
     const ValueType &val )
 {
+    RectangularRegion<CoordType> debugRegion( s.m_xMid - s.m_width, s.m_yMid - s.m_height, s.m_xMid + s.m_height, s.m_yMid + s.m_height );
+
+    if ( !debugRegion.inRegion( XYPoint<CoordType>( x, y ) ) )
+    {
+        std::cout << "Point placed in wrong quadrant" << std::endl;
+    }
     m_values.push_back( boost::make_tuple( x, y, val ) );
 }
 
@@ -140,8 +175,7 @@ template<typename CoordType, typename ValueType>
 template<typename CoordType, typename ValueType>
 /*virtual*/ void QuadTree<CoordType, ValueType>::TMVecContainer::visitRegion(
     const SplitStruct &s,
-    CoordType xMin, CoordType xMax,
-    CoordType yMin, CoordType yMax,
+    const RectangularRegion<CoordType> &bounds,
     visitFn_t fn )
 {
     //std::cout << "Visiting vec container with: " << m_values.size() << std::endl;
@@ -153,7 +187,7 @@ template<typename CoordType, typename ValueType>
         CoordType y = v.template get<1>();
         const ValueType &val = v.template get<2>();
         
-        if ( (x >= xMin) && (x < xMax) && (y >= yMin) && (y < yMax) )
+        if ( bounds.inRegion( XYPoint<CoordType>( x, y ) ) )
         {
             fn( x, y, val );
         }
@@ -164,8 +198,7 @@ template<typename CoordType, typename ValueType>
 template<typename CoordType, typename ValueType>
 /*virtual*/ void QuadTree<CoordType, ValueType>::TMQuadContainer::visitRegion(
     const SplitStruct &s,
-    CoordType xMin, CoordType xMax,
-    CoordType yMin, CoordType yMax,
+    const RectangularRegion<CoordType> &bounds,
     visitFn_t fn )
 {
     //std::cout << "Visiting a quad container" << std::endl;
@@ -175,8 +208,12 @@ template<typename CoordType, typename ValueType>
         {
             typename SplitStruct::splitQuad_t theQuad = (typename SplitStruct::splitQuad_t) i;
 
-            m_quadrants[i]->visitRegion( s.executeSplit( theQuad ),
-                xMin, xMax, yMin, yMax, fn );
+            RectangularRegion<CoordType> r = s.rectFor( theQuad );
+
+            if ( r.overlaps( bounds ) )
+            {
+                m_quadrants[i]->visitRegion( s.executeSplit( theQuad ), bounds, fn );
+            }
         }
     }
 }
