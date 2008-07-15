@@ -22,8 +22,28 @@ bool RectangularRegion<CoordType>::overlaps( const RectangularRegion<CoordType> 
         rhs.m_minMin.m_y <= m_minMin.m_y && rhs.m_maxMax.m_y >= m_maxMax.m_y;
 
     return cornerlessOverlap ||
-           inRegion( rhs.m_minMin ) || inRegion( rhs.m_maxMax ) ||
-           rhs.inRegion( m_minMin ) || rhs.inRegion( m_maxMax );
+        inRegion( rhs.m_minMin ) || inRegion( rhs.m_maxMax ) ||
+        inRegion( XYPoint<CoordType>( rhs.m_minMin.m_x, rhs.m_maxMax.m_y ) ) ||
+        inRegion( XYPoint<CoordType>( rhs.m_maxMax.m_x, rhs.m_minMin.m_y ) ) ||
+        rhs.inRegion( m_minMin ) || rhs.inRegion( m_maxMax ) ||
+        rhs.inRegion( XYPoint<CoordType>( m_minMin.m_x, m_maxMax.m_y ) ) ||
+        rhs.inRegion( XYPoint<CoordType>( m_maxMax.m_x, m_minMin.m_y ) );
+}
+
+template<typename CoordType>
+std::ostream &operator<<( std::ostream &stream, const XYPoint<CoordType> &val )
+{
+    stream << "(" << val.m_x << ", " << val.m_y << ")";
+
+    return stream;
+}
+
+template<typename CoordType>
+std::ostream &operator<<( std::ostream &stream, const RectangularRegion<CoordType> &val )
+{
+    stream << "<" << val.m_minMin << ", " << val.m_maxMax << ">";
+
+    return stream;
 }
 
 
@@ -50,6 +70,74 @@ void QuadTree<CoordType, ValueType>::visitRegion(
     boost::function<void( CoordType x, CoordType y, const ValueType & )> fn )
 {
     m_container.visitRegion( m_splitStruct, bounds, fn );
+}
+
+// Implementation in router.cpp - move this declaration somewhere more useful
+double distBetween( double lat1, double lon1, double lat2, double lon2 );
+
+template<typename CoordType, typename ValueType>
+class ClosestPointSearchFunctor
+{
+public:
+    typedef XYPoint<CoordType> point_t;
+
+private:
+    bool m_found;
+    double m_closestDist;
+    point_t m_refPoint, m_closest;
+
+public:
+    ClosestPointSearchFunctor( point_t refPoint ) : m_found ( false ), m_refPoint( refPoint ) {}
+    bool found() { return m_found; }
+    point_t closestPoint() { return m_closest; }
+
+    CoordType distBetween( const point_t &first, const point_t &second )
+    {
+        return ::distBetween( first.m_x, first.m_y, second.m_x, second.m_y );
+    }
+
+    void operator()( CoordType x, CoordType y, const ValueType & )
+    {
+        point_t newCoord( x, y );
+        CoordType dist = distBetween( m_refPoint, newCoord );
+
+        if ( m_found || dist < m_closestDist )
+        {
+            m_closest = newCoord;
+            m_closestDist = dist;
+            m_found = true;
+        }
+    }
+};
+
+template<typename CoordType, typename ValueType>
+XYPoint<CoordType> QuadTree<CoordType, ValueType>::closestPoint( const XYPoint<CoordType> &point )
+{
+    // Somewhat crap iterative algo - but should be pretty efficient under most conditions
+    double surveyWidth  = m_splitStruct.m_width / pow( 2.0, m_splitStruct.m_depthIter );
+    double surveyHeight = m_splitStruct.m_height / pow( 2.0, m_splitStruct.m_depthIter );
+
+    ClosestPointSearchFunctor<CoordType, ValueType> f( point );
+
+    do
+    {
+        RectangularRegion<CoordType> searchBounds(
+            XYPoint<CoordType>( point.m_x - surveyWidth, point.m_y - surveyHeight ),
+            XYPoint<CoordType>( point.m_x + surveyWidth, point.m_y + surveyHeight ) );
+
+        visitRegion( searchBounds, f );
+
+        if ( f.complete() )
+        {
+            return f.closestPoint();
+        }
+
+        surveyWidth  *= 2.0;
+        surveyHeight *= 2.0;
+    }
+    while ( surveyWidth < m_splitStruct.m_width || surveyWidth < m_splitStruct.m_height );
+
+    throw std::runtime_error( "No points found" );
 }
 
 template<typename CoordType, typename ValueType>

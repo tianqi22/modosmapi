@@ -9,6 +9,9 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <set>
+#include <iomanip>
+
 #include <boost/shared_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
@@ -17,8 +20,6 @@
 
 #include <boost/test/included/unit_test.hpp>
 #include <boost/test/floating_point_comparison.hpp>
-
-#include <iomanip>
 
 typedef boost::tuple<boost::uint64_t, std::string, boost::uint64_t, int, double, std::string, boost::posix_time::ptime> testTuple_t;
 
@@ -284,6 +285,18 @@ void testOverlaps()
     BOOST_ASSERT( !D.overlaps( F ) );
     BOOST_ASSERT( !G.overlaps( D ) );
     BOOST_ASSERT( !D.overlaps( G ) );
+
+    rect_t H( 4.0, -3.0, 9.0, 7.0 );
+    rect_t I( 0.0, 5.0, 5.0, 10.0 );
+    rect_t J( 5.0, -5.0, 10.0, 0 );
+
+    BOOST_ASSERT( !I.overlaps( J ) );
+    BOOST_ASSERT( H.overlaps( I ) );
+    BOOST_ASSERT( H.overlaps( J ) );
+
+    BOOST_ASSERT( !J.overlaps( I ) );
+    BOOST_ASSERT( I.overlaps( H ) );
+    BOOST_ASSERT( J.overlaps( H ) );
 }
 
 void testSplitStruct()
@@ -325,10 +338,8 @@ void testQuadTree()
 
     RectangularRegion<double> r( 4.0, -3.0, 9.0, 7.0 );
 
-    set<XYPoint<double> > found;
-
     size_t countInRegion = 0;
-    for ( int i = 0; i < 1000; i++ )
+    for ( int i = 0; i < 10000; i++ )
     {
         XYPoint<double> point( u(rng), u(rng) );
 
@@ -336,7 +347,6 @@ void testQuadTree()
 
         if ( r.inRegion( point ) )
         {
-            found.insert( point );
             countInRegion++;
         }
     }
@@ -344,8 +354,8 @@ void testQuadTree()
     CountVisitor cv;
     
     qt.visitRegion( r, boost::ref( cv ) );
-    std::cout << "Number in region: " << countInRegion << std::endl;
-    std::cout << "Count in region: " << cv.m_count << std::endl;
+
+    BOOST_CHECK_EQUAL( countInRegion, cv.m_count );
 }
 
 
