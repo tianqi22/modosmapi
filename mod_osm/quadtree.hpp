@@ -15,11 +15,6 @@ struct XYPoint
     XYPoint( CoordType x, CoordType y ) : m_x( x ), m_y( y )
     {
     }
-
-    bool operator()( const XYPoint<CoordType> &rhs )
-    {
-        
-    }
 };
 
 template<typename CoordType>
@@ -35,6 +30,12 @@ struct RectangularRegion
     {
     }
 };
+
+template<typename CoordType>
+std::ostream &operator<<( std::ostream &stream, const XYPoint<CoordType> &val );
+
+template<typename CoordType>
+std::ostream &operator<<( std::ostream &stream, const RectangularRegion<CoordType> &val );
 
 template<typename CoordType, typename ValueType>
 class QuadTree
@@ -113,10 +114,12 @@ public:
 
     SplitStruct     m_splitStruct;
     TMQuadContainer m_container;
+
 public:
     QuadTree( size_t depth, CoordType xMin, CoordType xMax, CoordType yMin, CoordType yMax );
     void add( CoordType x, CoordType y, const ValueType &val );
     void visitRegion( const RectangularRegion<CoordType> &bounds, visitFn_t fn );
+    XYPoint<CoordType> closestPoint( const XYPoint<CoordType> &point );
 };
 
 #include "quadtree.ipp"
