@@ -65,7 +65,7 @@ $(MODOSM_TARGET) : $(MODOSM_OBJECTS)
 
 $(UNIT_TEST_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
 $(UNIT_TEST_TARGET)	: LDFLAGS := -fPIC
-$(UNIT_TEST_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	build/mod_osm/engine.o build/mod_osm/ioxml.o testing/unittests.cpp
+$(UNIT_TEST_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	build/mod_osm/engine.o build/mod_osm/ioxml.o testing/unittests.cpp build/mod_osm/utils.o
 	$(Q)$(ECHO)	" [LINK] $(@F)"
 	$(Q)$(MKDIR) $(@D)
 	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)

@@ -83,11 +83,15 @@ public:
 
 private:
     bool m_found;
-    double m_closestDist;
     point_t m_refPoint, m_closest;
+    double m_closestDist;
 
 public:
-    ClosestPointSearchFunctor( point_t refPoint ) : m_found ( false ), m_refPoint( refPoint ) {}
+    ClosestPointSearchFunctor( const point_t &refPoint ) : m_found ( false ), m_refPoint( refPoint ),
+        m_closestDist( std::numeric_limits<CoordType>::quiet_NaN() )
+    {
+    }
+
     bool found() { return m_found; }
     point_t closestPoint() { return m_closest; }
 
@@ -114,8 +118,8 @@ template<typename CoordType, typename ValueType>
 XYPoint<CoordType> QuadTree<CoordType, ValueType>::closestPoint( const XYPoint<CoordType> &point )
 {
     // Somewhat crap iterative algo - but should be pretty efficient under most conditions
-    double surveyWidth  = m_splitStruct.m_width / pow( 2.0, m_splitStruct.m_depthIter );
-    double surveyHeight = m_splitStruct.m_height / pow( 2.0, m_splitStruct.m_depthIter );
+    CoordType surveyWidth  = m_splitStruct.m_width / pow( 2.0, m_splitStruct.m_depthIter );
+    CoordType surveyHeight = m_splitStruct.m_height / pow( 2.0, m_splitStruct.m_depthIter );
 
     ClosestPointSearchFunctor<CoordType, ValueType> f( point );
 
@@ -125,9 +129,11 @@ XYPoint<CoordType> QuadTree<CoordType, ValueType>::closestPoint( const XYPoint<C
             XYPoint<CoordType>( point.m_x - surveyWidth, point.m_y - surveyHeight ),
             XYPoint<CoordType>( point.m_x + surveyWidth, point.m_y + surveyHeight ) );
 
+        std::cout << "Searching within bounds: " << searchBounds << std::endl;
+
         visitRegion( searchBounds, f );
 
-        if ( f.complete() )
+        if ( f.found() )
         {
             return f.closestPoint();
         }
@@ -135,7 +141,7 @@ XYPoint<CoordType> QuadTree<CoordType, ValueType>::closestPoint( const XYPoint<C
         surveyWidth  *= 2.0;
         surveyHeight *= 2.0;
     }
-    while ( surveyWidth < m_splitStruct.m_width || surveyWidth < m_splitStruct.m_height );
+    while ( surveyWidth < 2.0*m_splitStruct.m_width || surveyHeight < 2.0*m_splitStruct.m_height );
 
     throw std::runtime_error( "No points found" );
 }
