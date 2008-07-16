@@ -379,7 +379,6 @@ void testQuadTree()
         }
 
         XYPoint<double> nearest2 = qt.closestPoint( point );
-        std::cout << "Two closest points: " << nearest << ", " << nearest2 << std::endl;
         BOOST_CHECK_CLOSE( nearest.m_x, nearest2.m_x, 1e-14 );
         BOOST_CHECK_CLOSE( nearest.m_y, nearest2.m_y, 1e-14 );
     }

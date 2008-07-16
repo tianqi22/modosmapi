@@ -105,7 +105,7 @@ public:
         point_t newCoord( x, y );
         CoordType dist = distBetween( m_refPoint, newCoord );
 
-        if ( m_found || dist < m_closestDist )
+        if ( !m_found || dist < m_closestDist )
         {
             m_closest = newCoord;
             m_closestDist = dist;
@@ -129,17 +129,15 @@ XYPoint<CoordType> QuadTree<CoordType, ValueType>::closestPoint( const XYPoint<C
             XYPoint<CoordType>( point.m_x - surveyWidth, point.m_y - surveyHeight ),
             XYPoint<CoordType>( point.m_x + surveyWidth, point.m_y + surveyHeight ) );
 
-        std::cout << "Searching within bounds: " << searchBounds << std::endl;
-
-        visitRegion( searchBounds, f );
+        visitRegion( searchBounds, boost::ref( f ) );
 
         if ( f.found() )
         {
             return f.closestPoint();
         }
 
-        surveyWidth  *= 2.0;
-        surveyHeight *= 2.0;
+        surveyWidth  *= 4.0;
+        surveyHeight *= 4.0;
     }
     while ( surveyWidth < 2.0*m_splitStruct.m_width || surveyHeight < 2.0*m_splitStruct.m_height );
 
