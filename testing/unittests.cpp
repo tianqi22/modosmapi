@@ -338,6 +338,8 @@ void testQuadTree()
 
     RectangularRegion<double> r( 4.0, -3.0, 9.0, 7.0 );
 
+    std::vector<XYPoint<double> > points;
+
     size_t countInRegion = 0;
     for ( int i = 0; i < 10000; i++ )
     {
@@ -349,6 +351,8 @@ void testQuadTree()
         {
             countInRegion++;
         }
+
+        points.push_back( point );
     }
 
     CountVisitor cv;
@@ -356,6 +360,29 @@ void testQuadTree()
     qt.visitRegion( r, boost::ref( cv ) );
 
     BOOST_CHECK_EQUAL( countInRegion, cv.m_count );
+
+    for ( int i = 0; i < 100; i++ )
+    {
+        XYPoint<double> point( u(rng), u(rng) );
+
+        // Find nearest by brute force
+        double closestDist = std::numeric_limits<double>::infinity();
+        XYPoint<double> nearest;
+        BOOST_FOREACH( const XYPoint<double> &p, points )
+        {
+            double dist = distBetween( p.m_x, p.m_y, point.m_x, point.m_y );
+            if ( dist < closestDist )
+            {
+                closestDist = dist;
+                nearest = p;
+            }
+        }
+
+        XYPoint<double> nearest2 = qt.closestPoint( point );
+        std::cout << "Two closest points: " << nearest << ", " << nearest2 << std::endl;
+        BOOST_CHECK_CLOSE( nearest.m_x, nearest2.m_x, 1e-14 );
+        BOOST_CHECK_CLOSE( nearest.m_y, nearest2.m_y, 1e-14 );
+    }
 }
 
 

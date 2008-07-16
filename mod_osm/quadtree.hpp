@@ -6,6 +6,9 @@
 #include <boost/function.hpp>
 
 #include <vector>
+#include <limits>
+
+double distBetween( double, double, double, double );
 
 template<typename CoordType>
 struct XYPoint
@@ -14,6 +17,15 @@ struct XYPoint
     
     XYPoint( CoordType x, CoordType y ) : m_x( x ), m_y( y )
     {
+    }
+
+    XYPoint() : m_x( std::numeric_limits<CoordType>::quiet_NaN() ), m_y( std::numeric_limits<CoordType>::quiet_NaN() )
+    {
+    }
+
+    bool operator==( const XYPoint<CoordType> &rhs ) const
+    {
+        return rhs.m_x == m_x && rhs.m_y == m_y;
     }
 };
 
@@ -27,6 +39,11 @@ struct RectangularRegion
     
     RectangularRegion( CoordType min_x, CoordType min_y, CoordType max_x, CoordType max_y ) :
         m_minMin( min_x, min_y ), m_maxMax( max_x, max_y )
+    {
+    }
+
+    RectangularRegion( XYPoint<CoordType> minMin, XYPoint<CoordType> maxMax ) :
+        m_minMin( minMin ), m_maxMax( maxMax )
     {
     }
 };
