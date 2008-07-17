@@ -24,42 +24,6 @@ typedef boost::tuple<string_t, dbId_t, string_t> member_t;
 #include "xml_reader.hpp"
 #include "../testing/equality_tester.hpp"
 
-#if 0
-class ConstTagString
-{
-private:
-    typedef std::map<std::string, size_t> stringMap_t;
-    static stringMap_t m_stringToMap;
-    static size_t m_lastIndex;
-    
-    size_t m_stringIndex;
-
-public:
-    ConstTagString( const std::string &str )
-    {
-        assignString( str );
-    }
-
-    void assignString( const std::string &str )
-    {
-        stringMap_t::iterator findIt = m_stringMap.find( str );
-
-        if ( findIt == m_stringMap.end() )
-        {
-            m_stringIndex = m_lastIndex++;
-            m_stringMap.insert( std::make_pair( str, m_stringIndex ) );            
-        }
-        else
-        {
-            m_stringIndex = findIt->second;
-        }
-    }
-};
-
-stringMap_t ConstTagString::m_stringToMap;
-size_t ConstTagString::m_lastIndex = 0;
-#endif
-
 class OSMFragment;
 
 class OSMBase
