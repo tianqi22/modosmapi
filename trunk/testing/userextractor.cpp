@@ -10,21 +10,21 @@
 #include <boost/date_time/gregorian/gregorian_types.hpp>
 
 
-void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
-{
-    xercesc::SAX2XMLReaderImpl &parser = x.getParser();
+// void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
+// {
+//     xercesc::SAX2XMLReaderImpl &parser = x.getParser();
 
-    boost::shared_ptr<XMLNodeData> startNdData( new XMLNodeData() );
+//     boost::shared_ptr<XMLNodeData> startNdData( new XMLNodeData() );
 
-    startNdData->registerMembers()( "osm", boost::bind( &OSMFragment::build, &frag, _1 ) );
+//     startNdData->registerMembers()( "osm", boost::bind( &OSMFragment::build, &frag, _1 ) );
 
-    XMLReader handler( startNdData );
+//     XMLReader handler( startNdData );
 
-    parser.setContentHandler( &handler );
-    parser.setErrorHandler( &handler );
+//     parser.setContentHandler( &handler );
+//     parser.setErrorHandler( &handler );
 
-    parser.parse( fileName.c_str() );
-}
+//     parser.parse( fileName.c_str() );
+// }
 
 
 int main( int argc, char **argv )

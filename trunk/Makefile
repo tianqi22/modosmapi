@@ -28,7 +28,7 @@ LIB_DIR     := $(BASE_DIR)/lib
 # Global flags
 CPPFLAGS    += -D_REENTRANT
 CPPFLAGS    += -D_XOPEN_SOURCE
-CPPFLAGS    += -Imod_osm
+CPPFLAGS    += -Iosm_core
 CPPFLAGS    += $(APACHE_CPPFLAGS)
 
 #CXXFLAGS    += -Wall -Werror
@@ -41,22 +41,33 @@ CXXFLAGS    += -g
 # Default rule
 default : all
 
+OSMCORE_DIR			:= osm_core
+OSMCORE_TARGET		:= $(LIB_DIR)/osm_core.o
+OSMCORE_SOURCES		:= $(wildcard $(OSMCORE_DIR)/*.cpp)
+OSMCORE_OBJECTS		:= $(OSMCORE_SOURCES:%.cpp=$(BUILD_DIR)/%.o)
+
 # mod_osm shared object
 MODOSM_DIR     		:= mod_osm
 MODOSM_TARGET  		:= $(LIB_DIR)/mod_osm.so
 MODOSM_SOURCES 		:= $(wildcard $(MODOSM_DIR)/*.cpp)
-MODOSM_OBJECTS 		:= $(MODOSM_SOURCES:%.cpp=$(BUILD_DIR)/%.o)
+MODOSM_OBJECTS 		:= $(MODOSM_SOURCES:%.cpp=$(BUILD_DIR)/%.o) $(LIB_DIR)/osm_core.o
 UNIT_TEST_TARGET	:= $(BIN_DIR)/unittests
 UE_TARGET		    := $(BIN_DIR)/userextractor
 OSMCOMPARE_TARGET	:= $(BIN_DIR)/osmcompare
+ROUTEAPP_TARGET		:= $(BIN_DIR)/routeapp
 ALL_TARGETS			+= $(MODOSM_TARGET)
 ALL_TARGETS			+= $(UNIT_TEST_TARGET)
 ALL_TARGETS			+= $(UE_TARGET)
 ALL_TARGETS			+= $(OSMCOMPARE_TARGET)
+ALL_TARGETS			+= $(ROUTEAPP_TARGET)
 -include $(MODOSM_OBJECTS:%.o=%.d)
 
+$(OSMCORE_TARGET)	: $(OSMCORE_OBJECTS)
+	$(Q)$(ECHO)	" [LINK] $(@F)"
+	$(Q)$(MKDIR) $(@D)
+	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
 
-$(MODOSM_TARGET) : LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
+$(MODOSM_TARGET) : LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS) 
 $(MODOSM_TARGET) : LDFLAGS := -shared -fPIC
 $(MODOSM_TARGET) : $(MODOSM_OBJECTS)
 	$(Q)$(ECHO) " [LINK] $(@F)"
@@ -65,25 +76,31 @@ $(MODOSM_TARGET) : $(MODOSM_OBJECTS)
 
 $(UNIT_TEST_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
 $(UNIT_TEST_TARGET)	: LDFLAGS := -fPIC
-$(UNIT_TEST_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	build/mod_osm/engine.o build/mod_osm/ioxml.o testing/unittests.cpp build/mod_osm/utils.o
+$(UNIT_TEST_TARGET)	: testing/unittests.cpp $(OSMCORE_TARGET)
 	$(Q)$(ECHO)	" [LINK] $(@F)"
 	$(Q)$(MKDIR) $(@D)
 	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
 
 $(UE_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
 $(UE_TARGET)	: LDFLAGS := -fPIC
-$(UE_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	 testing/userextractor.cpp
+$(UE_TARGET)	: testing/userextractor.cpp $(OSMCORE_TARGET)
 	$(Q)$(ECHO)	" [LINK] $(@F)"
 	$(Q)$(MKDIR) $(@D)
 	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
 
 $(OSMCOMPARE_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
 $(OSMCOMPARE_TARGET)	: LDFLAGS := -fPIC
-$(OSMCOMPARE_TARGET)	: build/mod_osm/xml_reader.o build/mod_osm/osm_data.o build/mod_osm/dbhandler.o	 testing/osm_xml_compare.cpp
+$(OSMCOMPARE_TARGET)	: testing/osm_xml_compare.cpp $(OSMCORE_TARGET)
 	$(Q)$(ECHO)	" [LINK] $(@F)"
 	$(Q)$(MKDIR) $(@D)
 	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
 
+$(ROUTEAPP_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
+$(ROUTEAPP_TARGET)	: LDFLAGS := -fPIC
+$(ROUTEAPP_TARGET)	: routeapp/routeapp.cpp $(OSMCORE_TARGET)
+	$(Q)$(ECHO)	" [LINK] $(@F)"
+	$(Q)$(MKDIR) $(@D)
+	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
 
 # Common compile rule
 $(BUILD_DIR)/%.o : %.cpp
