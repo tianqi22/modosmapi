@@ -155,26 +155,6 @@ void compareOSMXML( const OSMFragment &frag1, const OSMFragment &frag2 )
     }
 }
 
-void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
-{
-    std::cout << "Reading XML file: " << fileName << std::endl;
-
-    xercesc::SAX2XMLReaderImpl &parser = x.getParser();
-
-    boost::shared_ptr<XMLNodeData> startNdData( new XMLNodeData() );
-
-    startNdData->registerMembers()( "osm", boost::bind( &OSMFragment::build, &frag, _1 ) );
-
-    XMLReader handler( startNdData );
-
-    parser.setContentHandler( &handler );
-    parser.setErrorHandler( &handler );
-
-    parser.parse( fileName.c_str() );
-
-    std::cout << "Done..." << std::endl;
-}
-
 
 int main( int argc, char **argv )
 {

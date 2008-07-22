@@ -5,7 +5,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
+#include <boost/bind.hpp>
 
 #include <xercesc/util/PlatformUtils.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
@@ -219,5 +219,26 @@ void XMLReader::fatalError( const xercesc::SAXParseException &e )
      throw XmlParseException( boost::str( boost::format(
          "XML parse error (line: %d): %s" )
          % line % message ) );
+}
+
+
+void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
+{
+    std::cout << "Reading XML file: " << fileName << std::endl;
+
+    xercesc::SAX2XMLReaderImpl &parser = x.getParser();
+
+    boost::shared_ptr<XMLNodeData> startNdData( new XMLNodeData() );
+
+    startNdData->registerMembers()( "osm", boost::bind( &OSMFragment::build, &frag, _1 ) );
+
+    XMLReader handler( startNdData );
+
+    parser.setContentHandler( &handler );
+    parser.setErrorHandler( &handler );
+
+    parser.parse( fileName.c_str() );
+
+    std::cout << "Done..." << std::endl;
 }
 

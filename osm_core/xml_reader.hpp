@@ -173,4 +173,8 @@ XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName
     return *this;
 }
 
+class OSMFragment;
+
+void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag );
+
 #endif // XML_HPP

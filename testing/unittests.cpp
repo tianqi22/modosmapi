@@ -3,7 +3,7 @@
 #include "dbhandler.hpp"
 #include "quadtree.hpp"
 
-#include "engine.hpp"
+//#include "engine.hpp"
 
 
 #include <string>
@@ -159,23 +159,6 @@ void testDbHandler()
 }
 
 
-void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag )
-{
-    xercesc::SAX2XMLReaderImpl &parser = x.getParser();
-
-    boost::shared_ptr<XMLNodeData> startNdData( new XMLNodeData() );
-
-    startNdData->registerMembers()( "osm", boost::bind( &OSMFragment::build, &frag, _1 ) );
-
-    XMLReader handler( startNdData );
-
-    parser.setContentHandler( &handler );
-    parser.setErrorHandler( &handler );
-
-    parser.parse( fileName.c_str() );
-}
-
-
 void testXMLRead( std::string fileName, XercesInitWrapper &x )
 {
     OSMFragment newFragment;
@@ -226,9 +209,9 @@ void xmlParseTestFn()
 
 void tempMapQuery()
 {
-    std::ofstream ofs( "temp.txt" );
-    modosmapi::Context context;
-    modosmapi::map( ofs, context, 51.7387, 51.7803, -1.3163, -0.4132 );
+    //std::ofstream ofs( "temp.txt" );
+    //modosmapi::Context context;
+    //modosmapi::map( ofs, context, 51.7387, 51.7803, -1.3163, -0.4132 );
 }
 
 struct CountVisitor
