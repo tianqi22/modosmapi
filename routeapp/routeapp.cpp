@@ -37,7 +37,7 @@ private:
     QuadTree<double, dbId_t>        m_nodeCoords;    
 
 public:
-    RouteApp( const std::string &mapFileName ) : m_nodeCoords( -90, 90, -180, 180, 12 )
+    RouteApp( const std::string &mapFileName ) : m_nodeCoords( 12, -90, 90, -180, 180 )
     {
         std::cout << "Reading map data for file: " << mapFileName << std::endl;
         readMapData( mapFileName );
@@ -55,7 +55,7 @@ public:
             &QuadTree<double, dbId_t>::add,
             boost::ref( m_nodeCoords ),
             _1, _2, _3 ) );
-        //m_routingGraph->build( fn );
+        m_routingGraph->build( fn );
     }
 
     void readMapData( const std::string &mapFileName )

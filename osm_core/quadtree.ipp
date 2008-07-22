@@ -62,6 +62,7 @@ template<typename CoordType, typename ValueType>
 void QuadTree<CoordType, ValueType>::add( CoordType x, CoordType y, const ValueType &val )
 {
     std::cout << "Adding point: " << x << ", " << y << ": " << val << std::endl;
+
     m_container.add( m_splitStruct, x, y, val );
 }
 
@@ -229,7 +230,6 @@ template<typename CoordType, typename ValueType>
     const ValueType &val )
 {
     RectangularRegion<CoordType> debugRegion( s.m_xMid - s.m_width, s.m_yMid - s.m_height, s.m_xMid + s.m_height, s.m_yMid + s.m_height );
-
     if ( !debugRegion.inRegion( XYPoint<CoordType>( x, y ) ) )
     {
         std::cout << "Point placed in wrong quadrant" << std::endl;
@@ -245,7 +245,7 @@ template<typename CoordType, typename ValueType>
     CoordType y,
     const ValueType &val )
 {
-    size_t thisDepth = s.getDepth();   
+    size_t thisDepth = s.getDepth();
     if ( m_quadrants.empty() )
     {
         for ( size_t i = 0; i < 4; i++ )

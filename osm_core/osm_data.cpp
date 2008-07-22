@@ -123,7 +123,8 @@ void OSMFragment::build( XMLNodeData &data )
     data.registerMembers()
         ( "node", boost::bind( &OSMFragment::readNode, this, _1 ) )
         ( "way", boost::bind( &OSMFragment::readWay, this, _1 ) )
-        ( "relation", boost::bind( &OSMFragment::readRelation, this, _1 ) );
+        ( "relation", boost::bind( &OSMFragment::readRelation, this, _1 ) )
+        ( "bounds", boost::bind( &OSMFragment::readBounds, this, _1 ) );
 }
 
 void OSMFragment::readNode( XMLNodeData &data )
@@ -142,6 +143,11 @@ void OSMFragment::readRelation( XMLNodeData &data )
 {
     boost::shared_ptr<OSMRelation> newRelation( new OSMRelation( *this, data ) );
     m_relations.insert( std::make_pair( newRelation->getId(), newRelation ) );
+}
+
+void OSMFragment::readBounds( XMLNodeData &data )
+{
+    // Ignore for now
 }
 
 void OSMFragment::addUser( dbId_t userId, const std::string &userName )

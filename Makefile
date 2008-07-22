@@ -33,7 +33,7 @@ CPPFLAGS    += $(APACHE_CPPFLAGS)
 
 #CXXFLAGS    += -Wall -Werror
 CXXFLAGS	+= -Wall
-CXXFLAGS    += -O2
+#CXXFLAGS    += -O2
 CXXFLAGS    += -fexceptions -finline-functions
 CXXFLAGS    += -g
 
