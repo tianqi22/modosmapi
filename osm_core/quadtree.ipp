@@ -61,6 +61,7 @@ QuadTree<CoordType, ValueType>::QuadTree( size_t depth, CoordType xMin, CoordTyp
 template<typename CoordType, typename ValueType>
 void QuadTree<CoordType, ValueType>::add( CoordType x, CoordType y, const ValueType &val )
 {
+    std::cout << "Adding point: " << x << ", " << y << ": " << val << std::endl;
     m_container.add( m_splitStruct, x, y, val );
 }
 

@@ -53,12 +53,12 @@ void extended_lexical_cast( const std::string &val, bool &var )
     }
 }
 
-const boost::regex dateRegex( "(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})([\\+-]\\d{2}):(\\d{2})?" );
+const boost::regex dateRegex( "(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})" );//([\\+-]\\d{2}):(\\d{2})?" );
 
 void extended_lexical_cast( const std::string &val, boost::posix_time::ptime &var )
 {
     boost::smatch match;
-    if ( boost::regex_match( val, match, dateRegex ) )
+    if ( boost::regex_search( val, match, dateRegex ) )
     {
          var = boost::posix_time::ptime(
              boost::gregorian::date(
@@ -70,16 +70,17 @@ void extended_lexical_cast( const std::string &val, boost::posix_time::ptime &va
                  boost::lexical_cast<int>( match[5] ),
                  boost::lexical_cast<int>( match[6] ) ) );
 
-         boost::posix_time::time_duration offset(
-             boost::lexical_cast<int>( match[7] ),
-             boost::lexical_cast<int>( match[8] ),
-             0 );
+//          boost::posix_time::time_duration offset(
+//              boost::lexical_cast<int>( match[7] ),
+//              boost::lexical_cast<int>( match[8] ),
+//              0 );
 
          // TODO: Surely we should be adding this offset? But it doesn't seem to work...
          //var += offset;
     }
     else
     {
+        std::cout << "Match failed for "<< val << std::endl;
         throw boost::bad_lexical_cast();
     }
 }
