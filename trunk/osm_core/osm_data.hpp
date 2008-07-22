@@ -119,6 +119,7 @@ public:
     void readNode( XMLNodeData &data );
     void readWay( XMLNodeData &data );
     void readRelation( XMLNodeData &data );
+    void readBounds( XMLNodeData &data );
 
     void addUser( dbId_t userId, const std::string &userName );
 

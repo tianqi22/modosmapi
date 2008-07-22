@@ -13,27 +13,9 @@
 #include "osm_data.hpp"
 #include "exceptions.hpp"
 
+#include "router.hpp"
+
 using namespace std;
-
-
-typedef boost::adjacency_list<
-    // Both edges and all vertices stored in vectors
-    boost::vecS,
-    boost::vecS,
-    // Access to both input and output edges, in a directed graph
-    boost::bidirectionalS,
-    boost::property<boost::vertex_name_t, int>,
-    boost::property<boost::edge_index_t, size_t> > GraphType;
-
-typedef boost::graph_traits<GraphType>::vertex_descriptor VertexType;
-typedef boost::graph_traits<GraphType>::edge_descriptor EdgeType;
-
-typedef boost::property_map<GraphType, boost::edge_weight_t>::type EdgeWeightMapType;
-typedef boost::property_map<GraphType, boost::vertex_name_t>::type NodeIndexMapType;
-
-// Tag: key, value, length multiplier. Can have +inf
-typedef boost::tuple<std::string, std::string, double> wayWeighting_t;
-typedef std::vector<wayWeighting_t> wayWeightings_t;
 
 struct WeightMapLookup
 {
@@ -85,31 +67,6 @@ private:
 public:
     AStarVisitor( VertexType dest );
     void examine_vertex( VertexType u, const GraphType &g );
-};
-
-class RoutingGraph
-{
-    /* Member data */
-    /***************/
-private:
-    const OSMFragment&                      m_frag;
-    nodeIdToVertexMap_t                     m_nodeIdToVertexMap;
-    GraphType                               m_graph;
-
-    std::vector<std::string>                m_routableWayKeys;
-    wayWeightings_t                         m_wayWeightings;
-
-    size_t                                  m_nextEdgeId;
-    std::vector<double>                     m_edgeLengths;
-    std::vector<boost::shared_ptr<OSMWay> > m_edgeWays;
-
-public:
-    RoutingGraph( const OSMFragment &frag );
-    VertexType getVertex( boost::uint64_t nodeId );
-    EdgeType addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way );
-    bool validRoutingWay( const boost::shared_ptr<OSMWay> &way );
-    void build();
-    void calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, std::list<boost::uint64_t> &route );
 };
 
 
@@ -296,7 +253,7 @@ bool RoutingGraph::validRoutingWay( const boost::shared_ptr<OSMWay> &way )
 }
 
     
-void RoutingGraph::build()
+void RoutingGraph::build( boost::function<void( double, double, dbId_t )> routeNodeRegisterCallbackFn )
 {
     // First pass: count the number of ways each node belongs to
     typedef std::map<boost::uint64_t, size_t> nodeCountInWays_t;
@@ -316,10 +273,25 @@ void RoutingGraph::build()
             nodeCountInWays[way->getNodes().back()]++;
         }
     }
-        
+
+    const OSMFragment::nodeMap_t &nodeMap = m_frag.getNodes();
+    BOOST_FOREACH( const nodeCountInWays_t::value_type &v, nodeCountInWays )
+    {
+        if ( v.second > 1 )
+        {
+            const OSMFragment::nodeMap_t::const_iterator nFindIt = nodeMap.find( v.first );
+            if ( nFindIt == nodeMap.end() )
+            {
+                throw modosmapi::ModException( "Node not found in node map" );
+            }
+            boost::shared_ptr<OSMNode> thisNode = nFindIt->second;
+
+            routeNodeRegisterCallbackFn( thisNode->getLat(), thisNode->getLon(), v.first );
+        }
+    }        
+
     //EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, m_graph );
     // Make a routing graph edge for each relevant section of each way
-    const OSMFragment::nodeMap_t &nodeMap = m_frag.getNodes();
     BOOST_FOREACH( const OSMFragment::wayMap_t::value_type &v, m_frag.getWays() )
     {
         const boost::shared_ptr<OSMWay> &way = v.second;
