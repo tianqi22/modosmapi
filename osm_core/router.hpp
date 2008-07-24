@@ -10,7 +10,7 @@
 
 
 // Tag: key, value, length multiplier. Can have +inf
-typedef boost::tuple<std::string, std::string, double> wayWeighting_t;
+typedef boost::tuple<ConstTagString, ConstTagString, double> wayWeighting_t;
 typedef std::vector<wayWeighting_t> wayWeightings_t;
 
 

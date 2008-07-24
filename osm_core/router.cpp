@@ -88,7 +88,7 @@ double calculateWayWeight( boost::shared_ptr<OSMWay> theWay, const wayWeightings
     const tagMap_t &wayTags = theWay->getTags();
     BOOST_FOREACH( const wayWeighting_t &weightTuple, wayWeightings )
     {
-        std::string key, value;
+        ConstTagString key, value;
         double weight;
 
         boost::tie( key, value, weight ) = weightTuple;
@@ -228,8 +228,8 @@ void RoutingGraph::setCarWeights()
 RoutingGraph::RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
 {
     // TODO: We may want to fill these from a config file (not that likely to change though...)
-    //setCycleWeights();
-    setCarWeights();
+    setCycleWeights();
+    //setCarWeights();
 }
 
 VertexType RoutingGraph::getVertex( boost::uint64_t nodeId )
