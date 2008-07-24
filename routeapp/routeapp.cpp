@@ -90,17 +90,3 @@ void RouteApp::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, RoutingGr
 {
     m_routingGraph->calculateRoute( sourceNodeId, destNodeId, route );
 }
-
-
-// int main( int argc, char **argv )
-// {
-//     if ( argc != 2 )
-//     {
-//         std::cerr << "Usage: routeapp <OSM XML file>" << std::endl;
-//         return -1;
-//     }
-
-//     RouteApp r( argv[1] );
-// }
-
-

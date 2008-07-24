@@ -1,4 +1,5 @@
 #include <cmath>
+#include <iostream>
 
 #include <utils.hpp>
 
@@ -15,7 +16,9 @@ double distBetween( double lat1, double lon1, double lat2, double lon2 )
     double a2 = (lat2 / 180.0) * PI;
     double b2 = (lon2 / 180.0) * PI;
 
-    return 6378.0 * acos(cos(a1)*cos(b1)*cos(a2)*cos(b2) + cos(a1)*sin(b1)*cos(a2)*sin(b2) + sin(a1)*sin(a2));
+    double dist = 6378.0 * acos(cos(a1)*cos(b1)*cos(a2)*cos(b2) + cos(a1)*sin(b1)*cos(a2)*sin(b2) + sin(a1)*sin(a2));
+
+    return dist;
 }
 
 std::vector<std::string>    ConstTagString::m_theStrings;
