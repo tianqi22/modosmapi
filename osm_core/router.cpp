@@ -252,6 +252,15 @@ VertexType RoutingGraph::getVertex( boost::uint64_t nodeId )
     }
 }
 
+bool hasTag( const tagMap_t &tags, const std::string &key, const std::string &val )
+{
+    tagMap_t::const_iterator findIt = tags.find( key );
+    if ( findIt == tags.end() )
+    {
+        return false;
+    }
+    return findIt->second == val;
+}
 
 void RoutingGraph::addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way )
 {
@@ -264,17 +273,16 @@ void RoutingGraph::addEdge( VertexType source, VertexType dest, double length, b
 
     bool forward = true;
     bool backward = true;
-    if ( findIt != wayTags.end() )
+
+    if ( hasTag( wayTags, "oneway", "yes" ) ||
+         hasTag( wayTags, "oneway", "true" ) ||
+         hasTag( wayTags, "junction", "roundabout" ) )
     {
-        if ( findIt->second == "yes" ||
-             findIt->second == "true" )
-        {
-            backward = false;
-        }
-        else if ( findIt->second == "-1" )
-        {
-            forward = false;
-        }
+        backward = false;
+    }
+    else if ( hasTag( wayTags, "oneway", "-1" ) )
+    {
+        forward = false;
     }
 
     if ( forward )
