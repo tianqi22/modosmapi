@@ -211,6 +211,9 @@ void RoutingGraph::setCarWeights()
     m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway", 0.7 ) );
     m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway_link", 0.7 ) );
 
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "residential", 1.2 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "unclassified", 1.1 ) );
+
     m_wayWeightings.push_back( boost::make_tuple( "highway", "track", std::numeric_limits<double>::infinity() ) );
     m_wayWeightings.push_back( boost::make_tuple( "highway", "footway", std::numeric_limits<double>::infinity() ) );
     m_wayWeightings.push_back( boost::make_tuple( "highway", "cycleway", std::numeric_limits<double>::infinity() ) );
@@ -263,7 +266,8 @@ void RoutingGraph::addEdge( VertexType source, VertexType dest, double length, b
     bool backward = true;
     if ( findIt != wayTags.end() )
     {
-        if ( findIt->second == "yes" || findIt->second == "true" )
+        if ( findIt->second == "yes" ||
+             findIt->second == "true" )
         {
             backward = false;
         }
@@ -599,7 +603,6 @@ void RoutingGraph::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route
             dbId_t nodeToId = routeSeg.get<3>();
 
             std::cout << "WAY" << std::endl;
-            
             BOOST_FOREACH( const tagMap_t::value_type &v, theWay->getTags() )
             {
                 std::cout << "  " << v.first << ": " << v.second << std::endl;

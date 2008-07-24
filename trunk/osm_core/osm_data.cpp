@@ -55,7 +55,7 @@ void OSMNode::readTag( XMLNodeData &data )
     string_t k, v;
     data.readAttributes()( "k", k )( "v", v );
 
-    m_tags.insert( tag_t( k, v ) );
+    m_tags.insert( tag_t( ConstTagString( k ), ConstTagString( v ) ) );
 }
 
 
@@ -107,11 +107,12 @@ void OSMRelation::readMember( XMLNodeData &data )
 
 void OSMRelation::readTag( XMLNodeData &data )
 {
-    tag_t theTag;
+    std::string k, v;
+
     data.readAttributes()
-        ( "k", theTag.first )
-        ( "v", theTag.second );
-    m_tags.insert( theTag );
+        ( "k", k )
+        ( "v", v );
+    m_tags.insert( tag_t( k, v ) );
 }
 
 void OSMFragment::build( XMLNodeData &data )
