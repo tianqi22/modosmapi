@@ -19,8 +19,8 @@ typedef boost::adjacency_list<
     boost::vecS,
     boost::vecS,
     // Access to both input and output edges, in a directed graph
-    //boost::bidirectionalS,
-    boost::undirectedS,
+    boost::bidirectionalS,
+    //boost::undirectedS,
     boost::property<boost::vertex_name_t, int>,
     boost::property<boost::edge_index_t, size_t> > GraphType;
 
@@ -51,6 +51,7 @@ private:
     size_t                                       m_nextEdgeId;
     std::vector<double>                          m_edgeLengths;
     std::vector<boost::shared_ptr<OSMWay> >      m_edgeWays;
+    std::vector<bool>                            m_edgeWayBackwards;
 
     // For nodes on only one (routing) way: get the way from the node id
     typedef std::map<dbId_t, boost::shared_ptr<OSMWay> > nodeIdToWayMap_t;
@@ -59,7 +60,7 @@ private:
 public:
     RoutingGraph( const OSMFragment &frag );
     VertexType getVertex( boost::uint64_t nodeId );
-    EdgeType addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way );
+    void addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way );
     bool validRoutingWay( const boost::shared_ptr<OSMWay> &way );
     void build( boost::function<void( double, double, dbId_t, bool )> routeNodeRegisterCallback );
     void calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route_t &route );
@@ -68,9 +69,12 @@ public:
 
 private:
     boost::shared_ptr<OSMNode> getNodeById( dbId_t nodeId );
-    boost::shared_ptr<OSMWay>  wayFromEdge( EdgeType edge );
-    boost::shared_ptr<OSMWay>  getWayBetween( VertexType source, VertexType dest );
-    void getIntermediateNodes( boost::shared_ptr<OSMWay> theWay, dbId_t lastNodeId, dbId_t nodeId, route_t &intermediateNodes );
+    std::pair<boost::shared_ptr<OSMWay>, bool> wayFromEdge( EdgeType edge );
+    std::pair<boost::shared_ptr<OSMWay>, bool> getWayBetween( VertexType source, VertexType dest );
+    void getIntermediateNodes( boost::shared_ptr<OSMWay> theWay, bool wayBackwards, dbId_t lastNodeId, dbId_t nodeId, route_t &intermediateNodes );
+
+    void setCycleWeights();
+    void setCarWeights();
 };
 
 

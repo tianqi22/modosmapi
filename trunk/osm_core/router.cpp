@@ -167,10 +167,8 @@ void AStarVisitor::examine_vertex( VertexType u, const GraphType &g )
     }
 }
 
-
-RoutingGraph::RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
+void RoutingGraph::setCycleWeights()
 {
-    // TODO: We may want to fill these from a config file (not that likely to change though...)
     m_routableWayKeys.push_back( "highway" );
     m_routableWayKeys.push_back( "cycleway" );
     m_routableWayKeys.push_back( "tracktype" );
@@ -203,6 +201,25 @@ RoutingGraph::RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEd
     m_wayWeightings.push_back( boost::make_tuple( "highway", "bus_guideway", std::numeric_limits<double>::infinity() ) );
 }
 
+void RoutingGraph::setCarWeights()
+{
+    m_routableWayKeys.push_back( "highway" );
+
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "trunk", 0.8 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "trunk_link", 0.8 ) );
+    
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway", 0.7 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway_link", 0.7 ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "bus_guideway", std::numeric_limits<double>::infinity() ) );
+}
+
+RoutingGraph::RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
+{
+    // TODO: We may want to fill these from a config file (not that likely to change though...)
+    //setCycleWeights();
+    setCarWeights();
+}
+
 VertexType RoutingGraph::getVertex( boost::uint64_t nodeId )
 {
     nodeIdToVertexMap_t::const_iterator findIt = m_nodeIdToVertexMap.find( nodeId );
@@ -224,18 +241,44 @@ VertexType RoutingGraph::getVertex( boost::uint64_t nodeId )
 }
 
 
-EdgeType RoutingGraph::addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way )
+void RoutingGraph::addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way )
 {
     // Returns a pair: Edge descriptor, bool (true if edge added)
     EdgeType thisEdge;
     bool successfulInsert;
-        
-    boost::tie( thisEdge, successfulInsert ) = boost::add_edge( source, dest, m_nextEdgeId++, m_graph );
 
-    m_edgeLengths.push_back( length );
-    m_edgeWays.push_back( way );
-        
-    return thisEdge;
+    const tagMap_t &wayTags = way->getTags();
+    const tagMap_t::const_iterator findIt = wayTags.find( "oneway" );
+
+    bool forward = true;
+    bool backward = true;
+    if ( findIt != wayTags.end() )
+    {
+        if ( findIt->second == "yes" || findIt->second == "true" )
+        {
+            backward = false;
+        }
+        else if ( findIt->second == "-1" )
+        {
+            forward = false;
+        }
+    }
+
+    if ( forward )
+    {
+        boost::tie( thisEdge, successfulInsert ) = boost::add_edge( source, dest, m_nextEdgeId++, m_graph );
+        m_edgeLengths.push_back( length );
+        m_edgeWays.push_back( way );
+        m_edgeWayBackwards.push_back( false );
+    }
+
+    if ( backward )
+    {
+        boost::tie( thisEdge, successfulInsert ) = boost::add_edge( dest, source, m_nextEdgeId++, m_graph );
+        m_edgeLengths.push_back( length );
+        m_edgeWays.push_back( way );
+        m_edgeWayBackwards.push_back( true );
+    }
 }
     
 bool RoutingGraph::validRoutingWay( const boost::shared_ptr<OSMWay> &way )
@@ -408,17 +451,19 @@ VertexType RoutingGraph::getRouteVertex( dbId_t nodeId )
     return theNewVertex;
 }
 
-boost::shared_ptr<OSMWay> RoutingGraph::wayFromEdge( EdgeType edge )
+std::pair<boost::shared_ptr<OSMWay>, bool> RoutingGraph::wayFromEdge( EdgeType edge )
 {
     typedef boost::property_map<GraphType, boost::edge_index_t>::type EdgeIdMap_t;
     EdgeIdMap_t edgeIds = boost::get( boost::edge_index, m_graph );
     
     size_t edgeIndex = edgeIds[edge];
 
-    return m_edgeWays.at( edgeIndex );
+    boost::shared_ptr<OSMWay> way = m_edgeWays.at( edgeIndex );
+    bool wayBackwards = m_edgeWayBackwards.at( edgeIndex );
+    return std::make_pair( way, wayBackwards );
 }
 
-boost::shared_ptr<OSMWay> RoutingGraph::getWayBetween( VertexType source, VertexType dest )
+std::pair<boost::shared_ptr<OSMWay>, bool> RoutingGraph::getWayBetween( VertexType source, VertexType dest )
 {
     typedef boost::graph_traits<GraphType>::out_edge_iterator out_edge_iterator;
 
@@ -436,23 +481,30 @@ boost::shared_ptr<OSMWay> RoutingGraph::getWayBetween( VertexType source, Vertex
     throw std::runtime_error( "Failed to find edge" );
 }
 
-void RoutingGraph::getIntermediateNodes( boost::shared_ptr<OSMWay> theWay, dbId_t fromNodeId, dbId_t toNodeId, route_t &intermediateNodes )
+void RoutingGraph::getIntermediateNodes( boost::shared_ptr<OSMWay> theWay, bool wayBackwards, dbId_t fromNodeId, dbId_t toNodeId, route_t &intermediateNodes )
 {
     bool output = false;
     bool appendFront = false;
-    std::cout << "WAY: " << theWay->getId() << std::endl;
+    //std::cout << "WAY: " << theWay->getId() << std::endl;
     BOOST_FOREACH( dbId_t nodeId, theWay->getNodes() )
     {
         if ( !output )
         {
-            if ( nodeId == fromNodeId )
+            if ( wayBackwards )
             {
-                output = true;
+                if ( nodeId == toNodeId )
+                {
+                    output = true;
+                    appendFront = true;
+                }
             }
-            else if ( nodeId == toNodeId )
+            else
             {
-                output = true;
-                appendFront = true;
+                if ( nodeId == fromNodeId )
+                {
+                    output = true;
+                    appendFront = false;
+                }
             }
         }
         else
@@ -464,12 +516,12 @@ void RoutingGraph::getIntermediateNodes( boost::shared_ptr<OSMWay> theWay, dbId_
             boost::shared_ptr<OSMNode> theNode = getNodeById( nodeId );
             if ( appendFront )
             {
-                std::cout << "  front: " << nodeId << std::endl;
+                //std::cout << "  front: " << nodeId << std::endl;
                 intermediateNodes.push_front( theNode );
             }
             else
             {
-                std::cout << "  back : " << nodeId << std::endl;
+                //std::cout << "  back : " << nodeId << std::endl;
                 intermediateNodes.push_back( theNode );
             }
         }
@@ -505,6 +557,8 @@ void RoutingGraph::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route
         bool atStart = true;
         VertexType lastVertex = VertexType();
         dbId_t lastNodeId = 0;
+        typedef boost::tuple<boost::shared_ptr<OSMWay>, bool, dbId_t, dbId_t> routeSeg_t;
+        std::list<routeSeg_t> routeSegs;
         for ( VertexType v = destVertex; ; v = p[v] )
         {
             NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, m_graph );
@@ -512,27 +566,46 @@ void RoutingGraph::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route
 
             if ( !atStart )
             {
-                boost::shared_ptr<OSMWay> theWay = getWayBetween( lastVertex, v );
+                boost::shared_ptr<OSMWay> theWay;
+                bool wayBackwards;
+                boost::tie( theWay, wayBackwards ) = getWayBetween( v, lastVertex );
 
-                route_t intermediateNodes;
-                getIntermediateNodes( theWay, lastNodeId, nodeId, intermediateNodes );
-
-                BOOST_FOREACH( boost::shared_ptr<OSMNode> interNode, intermediateNodes )
-                {
-                    route.push_back( interNode );
-                }
+                routeSegs.push_front( routeSeg_t( theWay, wayBackwards, nodeId, lastNodeId ) );
             }
-            atStart = false;
-
-
-            boost::shared_ptr<OSMNode> theNode = getNodeById( nodeId );
-            route.push_back( theNode );
+            
             if ( p[v] == v )
             {
                 break;
             }
             lastVertex = v;
             lastNodeId = nodeId;
+            atStart = false;
+        }
+
+        BOOST_FOREACH( const routeSeg_t &routeSeg, routeSegs )
+        {
+            boost::shared_ptr<OSMWay> theWay = routeSeg.get<0>();
+            bool wayBackwards = routeSeg.get<1>();
+            dbId_t nodeFromId = routeSeg.get<2>();
+            dbId_t nodeToId = routeSeg.get<3>();
+
+            std::cout << "WAY" << std::endl;
+            
+            BOOST_FOREACH( const tagMap_t::value_type &v, theWay->getTags() )
+            {
+                std::cout << "  " << v.first << ": " << v.second << std::endl;
+            }
+            
+            route.push_back( getNodeById( nodeFromId ) );
+
+            route_t intermediateNodes;
+            getIntermediateNodes( theWay, wayBackwards, nodeFromId, nodeToId, intermediateNodes );
+            BOOST_FOREACH( boost::shared_ptr<OSMNode> interNode, intermediateNodes )
+            {
+                route.push_back( interNode );
+            }
+
+            route.push_back( getNodeById( nodeToId ) );
         }
     }        
 }
