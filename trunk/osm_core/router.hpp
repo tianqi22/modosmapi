@@ -19,7 +19,8 @@ typedef boost::adjacency_list<
     boost::vecS,
     boost::vecS,
     // Access to both input and output edges, in a directed graph
-    boost::bidirectionalS,
+    //boost::bidirectionalS,
+    boost::undirectedS,
     boost::property<boost::vertex_name_t, int>,
     boost::property<boost::edge_index_t, size_t> > GraphType;
 
@@ -35,7 +36,7 @@ typedef std::map<boost::uint64_t, VertexType> nodeIdToVertexMap_t;
 class RoutingGraph
 {
 public:
-    typedef std::list<std::pair<boost::shared_ptr<OSMNode>, boost::shared_ptr<OSMWay> > > route_t;
+    typedef std::list<boost::shared_ptr<OSMNode> > route_t;
 
     /* Member data */
     /***************/
@@ -61,12 +62,15 @@ public:
     EdgeType addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way );
     bool validRoutingWay( const boost::shared_ptr<OSMWay> &way );
     void build( boost::function<void( double, double, dbId_t, bool )> routeNodeRegisterCallback );
-    void calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, route_t &route );
+    void calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route_t &route );
 
     VertexType getRouteVertex( dbId_t nodeId );
 
 private:
     boost::shared_ptr<OSMNode> getNodeById( dbId_t nodeId );
+    boost::shared_ptr<OSMWay>  wayFromEdge( EdgeType edge );
+    boost::shared_ptr<OSMWay>  getWayBetween( VertexType source, VertexType dest );
+    void getIntermediateNodes( boost::shared_ptr<OSMWay> theWay, dbId_t lastNodeId, dbId_t nodeId, route_t &intermediateNodes );
 };
 
 
