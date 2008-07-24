@@ -210,6 +210,15 @@ void RoutingGraph::setCarWeights()
     
     m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway", 0.7 ) );
     m_wayWeightings.push_back( boost::make_tuple( "highway", "motorway_link", 0.7 ) );
+
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "track", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "footway", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "cycleway", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "bridleway", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "byway", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "steps", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "pedestrian", std::numeric_limits<double>::infinity() ) );
+    m_wayWeightings.push_back( boost::make_tuple( "highway", "pedestrian", std::numeric_limits<double>::infinity() ) );
     m_wayWeightings.push_back( boost::make_tuple( "highway", "bus_guideway", std::numeric_limits<double>::infinity() ) );
 }
 
