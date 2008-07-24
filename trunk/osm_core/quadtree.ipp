@@ -61,8 +61,6 @@ QuadTree<CoordType, ValueType>::QuadTree( size_t depth, CoordType xMin, CoordTyp
 template<typename CoordType, typename ValueType>
 void QuadTree<CoordType, ValueType>::add( CoordType x, CoordType y, const ValueType &val )
 {
-    std::cout << "Adding point: " << x << ", " << y << ": " << val << std::endl;
-
     m_container.add( m_splitStruct, x, y, val );
 }
 
@@ -81,12 +79,14 @@ template<typename CoordType, typename ValueType>
 class ClosestPointSearchFunctor
 {
 public:
+    typedef typename QuadTree<CoordType, ValueType>::coordEl_t el_t;
     typedef XYPoint<CoordType> point_t;
 
 private:
-    bool m_found;
-    point_t m_refPoint, m_closest;
-    double m_closestDist;
+    bool    m_found;
+    point_t m_refPoint;
+    el_t    m_closest;
+    double  m_closestDist;
 
 public:
     ClosestPointSearchFunctor( const point_t &refPoint ) : m_found ( false ), m_refPoint( refPoint ),
@@ -95,21 +95,21 @@ public:
     }
 
     bool found() { return m_found; }
-    point_t closestPoint() { return m_closest; }
+    el_t closestPoint() { return m_closest; }
 
     CoordType distBetween( const point_t &first, const point_t &second )
     {
         return ::distBetween( first.m_x, first.m_y, second.m_x, second.m_y );
     }
 
-    void operator()( CoordType x, CoordType y, const ValueType & )
+    void operator()( CoordType x, CoordType y, const ValueType &value )
     {
         point_t newCoord( x, y );
         CoordType dist = distBetween( m_refPoint, newCoord );
 
         if ( !m_found || dist < m_closestDist )
         {
-            m_closest = newCoord;
+            m_closest = el_t( x, y, value );
             m_closestDist = dist;
             m_found = true;
         }
@@ -117,7 +117,7 @@ public:
 };
 
 template<typename CoordType, typename ValueType>
-XYPoint<CoordType> QuadTree<CoordType, ValueType>::closestPoint( const XYPoint<CoordType> &point )
+typename QuadTree<CoordType, ValueType>::coordEl_t QuadTree<CoordType, ValueType>::closestPoint( const XYPoint<CoordType> &point )
 {
     // Somewhat crap iterative algo - but should be pretty efficient under most conditions
     CoordType surveyWidth  = m_splitStruct.m_width / pow( 2.0, m_splitStruct.m_depthIter );
@@ -178,10 +178,10 @@ QuadTree<CoordType, ValueType>::SplitStruct::executeSplit( splitQuad_t quad ) co
     newS.m_height /= 2.0;
     newS.m_depthIter -= 1;
     
-    if ( newS.m_depthIter < 0 )
-    {
-        throw std::exception();
-    }
+//     if ( newS.m_depthIter < 0 )
+//     {
+//         throw std::exception();
+//     }
     
     if ( quad & 1 ) newS.m_xMid += newS.m_width;
     else newS.m_xMid -= newS.m_width;
@@ -267,12 +267,11 @@ template<typename CoordType, typename ValueType>
 
 template<typename CoordType, typename ValueType>
 /*virtual*/ void QuadTree<CoordType, ValueType>::TMVecContainer::visitRegion(
-    const SplitStruct &s,
+    const SplitStruct &,
     const RectangularRegion<CoordType> &bounds,
     visitFn_t fn )
 {
     //std::cout << "Visiting vec container with: " << m_values.size() << std::endl;
-    typedef typename QuadTree<CoordType, ValueType>::TMVecContainer::coordEl_t coordEl_t;
 
     BOOST_FOREACH( const coordEl_t &v, m_values )
     {

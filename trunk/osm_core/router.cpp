@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <cmath>
+#include <iomanip>
 
 #include "utils.hpp"
 #include "osm_data.hpp"
@@ -169,6 +170,9 @@ void AStarVisitor::examine_vertex( VertexType u, const GraphType &g )
 
 RoutingGraph::RoutingGraph( const OSMFragment &frag ) : m_frag( frag ), m_nextEdgeId( 0 )
 {
+    cout << scientific;
+    cout.precision( 5 );
+
     // TODO: We may want to fill these from a config file (not that likely to change though...)
     m_routableWayKeys.push_back( "highway" );
     m_routableWayKeys.push_back( "cycleway" );
@@ -252,8 +256,18 @@ bool RoutingGraph::validRoutingWay( const boost::shared_ptr<OSMWay> &way )
     return false;
 }
 
-    
-void RoutingGraph::build( boost::function<void( double, double, dbId_t )> routeNodeRegisterCallbackFn )
+boost::shared_ptr<OSMNode> RoutingGraph::getNodeById( dbId_t nodeId )
+{
+    const OSMFragment::nodeMap_t &nodeMap = m_frag.getNodes();
+    OSMFragment::nodeMap_t::const_iterator nFindIt = nodeMap.find( nodeId );
+    if ( nFindIt == nodeMap.end() )
+    {
+        throw modosmapi::ModException( "Node not found in node map" );
+    }
+    return nFindIt->second;
+}
+
+void RoutingGraph::build( boost::function<void( double, double, dbId_t, bool )> routeNodeRegisterCallbackFn )
 {
     // First pass: count the number of ways each node belongs to
     typedef std::map<boost::uint64_t, size_t> nodeCountInWays_t;
@@ -274,21 +288,13 @@ void RoutingGraph::build( boost::function<void( double, double, dbId_t )> routeN
         }
     }
 
-    const OSMFragment::nodeMap_t &nodeMap = m_frag.getNodes();
     BOOST_FOREACH( const nodeCountInWays_t::value_type &v, nodeCountInWays )
     {
-        if ( v.second > 1 )
-        {
-            const OSMFragment::nodeMap_t::const_iterator nFindIt = nodeMap.find( v.first );
-            if ( nFindIt == nodeMap.end() )
-            {
-                throw modosmapi::ModException( "Node not found in node map" );
-            }
-            boost::shared_ptr<OSMNode> thisNode = nFindIt->second;
+        boost::shared_ptr<OSMNode> thisNode = getNodeById( v.first );
+        
+        routeNodeRegisterCallbackFn( thisNode->getLat(), thisNode->getLon(), v.first, v.second > 1 );
+    }
 
-            routeNodeRegisterCallbackFn( thisNode->getLat(), thisNode->getLon(), v.first );
-        }
-    }        
 
     //EdgeWeightMapType edgeWeightMap = boost::get( boost::edge_weight, m_graph );
     // Make a routing graph edge for each relevant section of each way
@@ -302,12 +308,7 @@ void RoutingGraph::build( boost::function<void( double, double, dbId_t )> routeN
             double cumulativeDistance= 0.0;
             BOOST_FOREACH( boost::uint64_t nodeId, way->getNodes() )
             {
-                const OSMFragment::nodeMap_t::const_iterator nFindIt = nodeMap.find( nodeId );
-                if ( nFindIt == nodeMap.end() )
-                {
-                    throw modosmapi::ModException( "Node not found in node map" );
-                }
-                boost::shared_ptr<OSMNode> thisNode = nFindIt->second;
+                boost::shared_ptr<OSMNode> thisNode = getNodeById( nodeId );
                     
                 if ( nodeCountInWays[nodeId] > 1 )
                 {
@@ -316,6 +317,7 @@ void RoutingGraph::build( boost::function<void( double, double, dbId_t )> routeN
                         
                     if ( lastRouteVertex )
                     {
+                        std::cout << "Adding edge with length: " << cumulativeDistance << std::endl;
                         addEdge( lastRouteVertex, thisVertex, cumulativeDistance, way );
                     }
                         
@@ -329,6 +331,8 @@ void RoutingGraph::build( boost::function<void( double, double, dbId_t )> routeN
                         lastNode->getLon(),
                         thisNode->getLat(),
                         thisNode->getLon() );
+
+                    m_nodeIdToWay.insert( std::make_pair( nodeId, way ) );
                 }
 
                 lastNode = thisNode;
@@ -337,25 +341,84 @@ void RoutingGraph::build( boost::function<void( double, double, dbId_t )> routeN
     }
 }
 
-// Assumes both nodes exists in the routing graph
-void RoutingGraph::calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, std::list<boost::uint64_t> &route )
-{
-    // Get the begin and end vertices
-    nodeIdToVertexMap_t::const_iterator findIt;
-        
-    findIt = m_nodeIdToVertexMap.find( sourceNodeId );
-    if ( findIt == m_nodeIdToVertexMap.end() )
-    {
-        throw modosmapi::ModException( "Source node id not vertex map" );
-    }
-    VertexType sourceVertex = findIt->second;
 
-    findIt = m_nodeIdToVertexMap.find( destNodeId );
-    if ( findIt == m_nodeIdToVertexMap.end() )
+VertexType RoutingGraph::getRouteVertex( dbId_t nodeId )
+{
+    nodeIdToVertexMap_t::const_iterator vfindIt = m_nodeIdToVertexMap.find( nodeId );
+    if ( vfindIt != m_nodeIdToVertexMap.end() )
     {
-        throw modosmapi::ModException( "Dest node id not vertex map" );
+        std::cout << "Vertex exists" << std::endl;
+        return vfindIt->second;
     }
-    VertexType destVertex = findIt->second;
+
+    nodeIdToWayMap_t::const_iterator nfindIt = m_nodeIdToWay.find( nodeId );
+    if ( nfindIt == m_nodeIdToWay.end() )
+    {
+        throw std::runtime_error( "Node not found..." );
+    }
+    boost::shared_ptr<OSMWay> theWay = nfindIt->second;
+
+    double cumulativeDistance = 0.0;
+    boost::shared_ptr<OSMNode> lastNode;
+    VertexType lastRouteVertex = VertexType();
+    bool lastIsNewVertex = false;
+    VertexType theNewVertex;
+    BOOST_FOREACH( dbId_t wayNodeId, theWay->getNodes() )
+    {
+        vfindIt = m_nodeIdToVertexMap.find( wayNodeId );
+        bool isRoutingVertex = vfindIt != m_nodeIdToVertexMap.end();
+        bool isNewVertex = wayNodeId == nodeId;
+
+        boost::shared_ptr<OSMNode> thisNode = getNodeById( nodeId );
+
+        if ( isRoutingVertex || isNewVertex )
+        {
+            VertexType thisVertex;
+            if ( isRoutingVertex )
+            {
+                thisVertex = vfindIt->second;
+            }
+            else
+            {
+                // Make this vertex and add it to the map
+                thisVertex = getVertex( nodeId );
+                theNewVertex = thisVertex;
+            }
+
+            if ( isNewVertex || lastIsNewVertex )
+            {
+                std::cout << "Connecting vertices with dist: " << cumulativeDistance << std::endl;
+                addEdge( lastRouteVertex, thisVertex, cumulativeDistance, theWay );
+            }
+
+            lastIsNewVertex = isNewVertex;
+            lastRouteVertex = thisVertex;
+            cumulativeDistance = 0.0;
+        }
+        else
+        {
+            cumulativeDistance += distBetween(
+                lastNode->getLat(),
+                lastNode->getLon(),
+                thisNode->getLat(),
+                thisNode->getLon() );
+        }
+
+        lastNode = thisNode;
+    }
+
+    return theNewVertex;
+}
+
+// Assumes both nodes exists in the routing graph
+void RoutingGraph::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route_t &route )
+{
+    std::cout << "Calling calculate route" << std::endl;
+    // Get the begin and end vertices
+    VertexType sourceVertex = getRouteVertex( sourceNodeId );
+    VertexType destVertex   = getRouteVertex( destNodeId );
+    
+    std::cout << "Got source and dest vertices" << std::endl;
 
     NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, m_graph );
     std::vector<VertexType> p( num_vertices( m_graph ) );
@@ -363,6 +426,7 @@ void RoutingGraph::calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t
 
     WeightMapLookup wml( m_graph, m_edgeWays, m_edgeLengths, m_wayWeightings );
 
+    std::cout << "About to route..." << std::endl;
     try
     {
         astar_search( m_graph, sourceVertex,
@@ -379,7 +443,9 @@ void RoutingGraph::calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t
         {
             NodeIndexMapType nodeIndexMap = boost::get( boost::vertex_name, m_graph );
             boost::uint64_t nodeId = nodeIndexMap[v];
-            route.push_front( nodeId );
+            //route.push_front( nodeId );
+
+            std::cout << nodeId << std::endl;
 
             if ( p[v] == v )
             {

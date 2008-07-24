@@ -315,7 +315,8 @@ void testSplitStruct()
 
 void testQuadTree()
 {
-    QuadTree<double, std::string> qt( 7, -10.0, 10.0, -10.0, 10.0 );
+    typedef QuadTree<double, std::string> qt_t;
+    qt_t qt( 7, -10.0, 10.0, -10.0, 10.0 );
     boost::mt19937 rng;
     boost::uniform_real<double> u( -10.0, 10.0 );
 
@@ -361,9 +362,9 @@ void testQuadTree()
             }
         }
 
-        XYPoint<double> nearest2 = qt.closestPoint( point );
-        BOOST_CHECK_CLOSE( nearest.m_x, nearest2.m_x, 1e-14 );
-        BOOST_CHECK_CLOSE( nearest.m_y, nearest2.m_y, 1e-14 );
+        qt_t::coordEl_t qtPoint = qt.closestPoint( point );
+        BOOST_CHECK_CLOSE( nearest.m_x, qtPoint.get<0>(), 1e-14 );
+        BOOST_CHECK_CLOSE( nearest.m_y, qtPoint.get<1>(), 1e-14 );
     }
 }
 
