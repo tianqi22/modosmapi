@@ -34,27 +34,40 @@ typedef std::map<boost::uint64_t, VertexType> nodeIdToVertexMap_t;
 
 class RoutingGraph
 {
+public:
+    typedef std::list<std::pair<boost::shared_ptr<OSMNode>, boost::shared_ptr<OSMWay> > > route_t;
+
     /* Member data */
     /***************/
 private:
-    const OSMFragment&                      m_frag;
-    nodeIdToVertexMap_t                     m_nodeIdToVertexMap;
-    GraphType                               m_graph;
+    const OSMFragment&                           m_frag;
+    nodeIdToVertexMap_t                          m_nodeIdToVertexMap;
+    GraphType                                    m_graph;
 
-    std::vector<std::string>                m_routableWayKeys;
-    wayWeightings_t                         m_wayWeightings;
+    std::vector<std::string>                     m_routableWayKeys;
+    wayWeightings_t                              m_wayWeightings;
 
-    size_t                                  m_nextEdgeId;
-    std::vector<double>                     m_edgeLengths;
-    std::vector<boost::shared_ptr<OSMWay> > m_edgeWays;
+    size_t                                       m_nextEdgeId;
+    std::vector<double>                          m_edgeLengths;
+    std::vector<boost::shared_ptr<OSMWay> >      m_edgeWays;
+
+    // For nodes on only one (routing) way: get the way from the node id
+    typedef std::map<dbId_t, boost::shared_ptr<OSMWay> > nodeIdToWayMap_t;
+    nodeIdToWayMap_t m_nodeIdToWay;
 
 public:
     RoutingGraph( const OSMFragment &frag );
     VertexType getVertex( boost::uint64_t nodeId );
     EdgeType addEdge( VertexType source, VertexType dest, double length, boost::shared_ptr<OSMWay> way );
     bool validRoutingWay( const boost::shared_ptr<OSMWay> &way );
-    void build( boost::function<void( double, double, dbId_t )> routeNodeRegisterCallback );
-    void calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, std::list<boost::uint64_t> &route );
+    void build( boost::function<void( double, double, dbId_t, bool )> routeNodeRegisterCallback );
+    void calculateRoute( boost::uint64_t sourceNodeId, boost::uint64_t destNodeId, route_t &route );
+
+    VertexType getRouteVertex( dbId_t nodeId );
+
+private:
+    boost::shared_ptr<OSMNode> getNodeById( dbId_t nodeId );
 };
+
 
 #endif // ROUTER_HPP

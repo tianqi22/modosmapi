@@ -58,6 +58,7 @@ template<typename CoordType, typename ValueType>
 class QuadTree
 {
 public:
+    typedef boost::tuple<CoordType, CoordType, ValueType> coordEl_t;
     typedef boost::function<void( CoordType x, CoordType y, const ValueType & )> visitFn_t;
 
     class SplitStruct
@@ -103,9 +104,6 @@ public:
     
     class TMVecContainer : public TMContBase
     {
-    public:
-        typedef boost::tuple<CoordType, CoordType, ValueType> coordEl_t;
-
     private:
         std::vector<coordEl_t> m_values;
 
@@ -136,7 +134,7 @@ public:
     QuadTree( size_t depth, CoordType xMin, CoordType xMax, CoordType yMin, CoordType yMax );
     void add( CoordType x, CoordType y, const ValueType &val );
     void visitRegion( const RectangularRegion<CoordType> &bounds, visitFn_t fn );
-    XYPoint<CoordType> closestPoint( const XYPoint<CoordType> &point );
+    coordEl_t closestPoint( const XYPoint<CoordType> &point );
 };
 
 #include "quadtree.ipp"
