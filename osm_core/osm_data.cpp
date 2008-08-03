@@ -64,7 +64,7 @@ OSMWay::OSMWay( OSMFragment &frag, XMLNodeData &data )
     readBaseData( frag, data );
 
     data.readAttributes()
-        ( "visible", m_visible, true, true );
+      ( "visible", m_visible, true, true );
 
     data.registerMembers()
         ( "nd", boost::bind( &OSMWay::readNd, this, _1 ) )
@@ -114,6 +114,7 @@ void OSMRelation::readTag( XMLNodeData &data )
         ( "v", v );
     m_tags.insert( tag_t( k, v ) );
 }
+
 
 void OSMFragment::build( XMLNodeData &data )
 {

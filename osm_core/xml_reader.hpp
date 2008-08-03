@@ -14,7 +14,9 @@
 
 #include <xercesc/sax2/Attributes.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
+#include <xercesc/sax/InputSource.hpp>
 #include <xercesc/parsers/SAX2XMLReaderImpl.hpp>
+#include <xercesc/util/BinInputStream.hpp>
 
 typedef std::map<std::string, std::string> attributeMap_t;
 
@@ -176,5 +178,54 @@ XMLNodeAttributeMap &XMLNodeAttributeMap::operator()( const std::string &tagName
 class OSMFragment;
 
 void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment &frag );
+
+
+class StreamIS : public xercesc::InputSource
+{
+private:
+    class SBIS : public xercesc::BinInputStream
+    {
+    public:
+        SBIS( std::istream &is ) : m_is(is), m_curPos(0)
+        {
+        }
+        virtual unsigned int readBytes( XMLByte *const buf, const unsigned int bufSize )
+        {
+            try
+            {
+                m_is.read( reinterpret_cast<char * const>( buf ), bufSize );
+                size_t readCount = m_is.gcount();
+                m_curPos += readCount;
+                return readCount;
+            }
+            catch(...)
+            {
+                throw std::runtime_error( "Error in reading from stream" );
+            }
+        }
+
+        virtual unsigned int curPos() const
+        {
+            return m_curPos;
+        }
+
+    private:
+        std::istream &m_is;
+        size_t m_curPos;
+    };
+
+public:
+    StreamIS( std::istream &is ) : m_is( is )
+    {
+    }
+
+    virtual xercesc::BinInputStream *makeStream() const
+    {
+        return new SBIS( m_is );
+    }
+
+private:
+    std::istream &m_is;
+};
 
 #endif // XML_HPP

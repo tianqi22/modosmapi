@@ -20,7 +20,6 @@
 typedef boost::uint64_t dbId_t;
 typedef std::string string_t;
 typedef std::pair<ConstTagString, ConstTagString> tag_t;
-//typedef std::map<std::string, std::string> tagMap_t;
 typedef std::map<ConstTagString, ConstTagString> tagMap_t;
 typedef boost::tuple<string_t, dbId_t, string_t> member_t;
 
