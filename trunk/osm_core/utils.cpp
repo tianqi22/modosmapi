@@ -57,11 +57,6 @@ void ConstTagString::assignString( const std::string &str )
     
     if ( findIt == m_stringIndexMap.end() )
     {
-        size_t numStrings = m_stringIndexMap.size();
-        if ( (numStrings  % 200) == 199 )
-        {
-            std::cout << "Num strings: " << numStrings << std::endl;
-        }
         m_theStrings.push_back( str );
         m_stringIndex = m_lastIndex++;
         m_stringIndexMap.insert( std::make_pair( str, m_stringIndex ) );            
@@ -76,6 +71,7 @@ bool ConstTagString::operator==( const ConstTagString &rhs ) const
 {
     return m_stringIndex == rhs.m_stringIndex;
 }
+
 
 bool ConstTagString::operator<( const ConstTagString &rhs ) const
 {

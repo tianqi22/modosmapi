@@ -4,6 +4,10 @@
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/astar_search.hpp>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
 #include <iostream>
 #include <map>
@@ -629,4 +633,30 @@ void RoutingGraph::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route
         }
     }        
 }
+
+void parseString( const std::string &theString, std::map<std::string, std::vector<std::string> > &keyVals )
+{
+    std::string trimmed = boost::algorithm::trim_copy( theString );
+
+    std::vector<std::string> els;
+    boost::algorithm::split( els, trimmed, boost::algorithm::is_any_of( ";" ) );
+
+    BOOST_FOREACH( const std::string &subEl, els )
+    {
+        std::vector<std::string> keyVal;
+        boost::algorithm::split( keyVal, subEl, boost::algorithm::is_any_of( "=" ) );
+
+        if ( keyVal.size() != 2 )
+        {
+            throw std::runtime_error( "Unexpected query string" );
+        }
+
+
+        std::vector<std::string> values;
+        boost::algorithm::split( values, keyVal[1], boost::algorithm::is_any_of( "," ) );
+
+        keyVals.insert( std::make_pair( keyVal[0], values ) );
+    }
+}
+
 

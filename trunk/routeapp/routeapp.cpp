@@ -18,13 +18,19 @@
 
 
 #include "xml_reader.hpp"
+#include "osm_data.hpp"
 #include "routeapp.hpp"
+
+#include <boost/format.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/asio.hpp>
 
 
 RouteApp::RouteApp( const std::string &mapFileName ) : m_nodeCoords( 12, -90, 90, -180, 180 )
 {
     std::cout << "Reading map data for file: " << mapFileName << std::endl;
     readMapData( mapFileName );
+    std::cout << "Reading map data complete" << std::endl;
     buildRoutingGraph();
     std::cout << "Routeapp object construction complete" << std::endl;
 }
@@ -89,4 +95,127 @@ boost::shared_ptr<OSMNode> RouteApp::getNodeById( dbId_t nodeId )
 void RouteApp::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, RoutingGraph::route_t &route )
 {
     m_routingGraph->calculateRoute( sourceNodeId, destNodeId, route );
+}
+
+void parseString( const std::string &theString, std::map<std::string, std::vector<std::string> > &keyVals );
+
+
+namespace asio=boost::asio;
+using asio::ip::tcp;
+
+
+class RouteSocketMon
+{
+    asio::io_service m_ioservice;
+    RouteApp &m_routeApp;
+    
+public:
+    RouteSocketMon( RouteApp &routeApp ) : m_routeApp( routeApp )
+    {
+    }
+
+    void run();
+    std::string parseRequest( const std::string &request );
+};
+
+
+
+void RouteSocketMon::run()
+{
+    tcp::acceptor acceptor( m_ioservice, tcp::endpoint( tcp::v4(), 5168 ) );
+
+    tcp::socket socket( m_ioservice );
+    acceptor.accept( socket );
+    
+    while ( true )
+    {
+        std::stringstream ss;
+        while ( true )
+        {
+            boost::array<char, 128> buf;
+            boost::system::error_code error;
+            
+            size_t len = socket.read_some( asio::buffer( buf ), error );
+            
+            ss.write( buf.data(), len );
+            
+            if ( buf[len-1] == '\n' ) break;
+        }
+        std::string request = ss.str();
+
+        std::string result = parseRequest( request );
+
+        // Now send the result back down the socket
+        result += "\n";
+        asio::write( socket, asio::buffer( result ), asio::transfer_all() );
+    }
+}
+
+std::string RouteSocketMon::parseRequest( const std::string &request )
+{
+    std::map<std::string, std::vector<std::string> > keyVals;
+
+    parseString( request, keyVals );
+
+    std::string requestType = keyVals["request"][0];
+    if ( requestType == "closest" )
+    {
+        // request=closest;coords=<lat>,<lon>
+        std::vector<std::string> coords = keyVals["coords"];
+        double lat = boost::lexical_cast<double>( coords[0] );
+        double lon = boost::lexical_cast<double>( coords[1] );
+
+        boost::shared_ptr<OSMNode> nearest = m_routeApp.getClosestNode( xyPoint_t( lat, lon ) );
+
+        // closest=<nodeid>,<lat>,<lon>
+        return boost::str( boost::format( "closest=%d,%f,%f" )
+                           % nearest->getId()
+                           % nearest->getLon()
+                           % nearest->getLat() );
+
+    }
+    else if ( requestType == "route" )
+    {
+        // request=route;endpoints=<startnode>,<endnode>
+        std::vector<std::string> endPoints = keyVals["endpoints"];
+
+        dbId_t startId = boost::lexical_cast<dbId_t>( endPoints[0] );
+        dbId_t endId   = boost::lexical_cast<dbId_t>( endPoints[1] );
+
+        RoutingGraph::route_t route;
+        m_routeApp.calculateRoute( startId, endId, route );
+
+        // 0=<nodeid>,<lat>,<lon>;1=<nodeid>,<lat>,<lon>
+        std::stringstream ss;
+        size_t count = 0;
+        std::vector<std::string> routeEls;
+        BOOST_FOREACH( boost::shared_ptr<OSMNode> theNode, route )
+        {
+            dbId_t id = theNode->getId();
+            double lat = theNode->getLat();
+            double lon = theNode->getLon();
+
+            routeEls.push_back( boost::str( boost::format( "%06d=%d,%f,%f" )
+                                            % count++
+                                            % id
+                                            % lat
+                                            % lon ) );
+        }
+
+        return boost::algorithm::join( routeEls, ";" );
+    }
+    else
+    {
+        return "Unrecognised request";
+    }
+}
+
+
+int main( int argc, char **argv )
+{
+    RouteApp ra( argv[1] );
+
+    RouteSocketMon sm( ra );
+
+    sm.run();
 }

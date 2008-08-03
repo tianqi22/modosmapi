@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 
 #include <boost/format.hpp>
@@ -6,6 +7,9 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/bind.hpp>
+
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filter/bzip2.hpp>
 
 #include <xercesc/util/PlatformUtils.hpp>
 #include <xercesc/sax2/DefaultHandler.hpp>
@@ -30,7 +34,6 @@ std::string transcodeString( const XMLCh *const toTranscode )
     char *fLocalForm = xercesc::XMLString::transcode( toTranscode );
     std::string theString( fLocalForm );
     xercesc::XMLString::release( &fLocalForm );
-
     return theString;
 }
 
@@ -238,7 +241,13 @@ void readOSMXML( XercesInitWrapper &x, const std::string &fileName, OSMFragment 
     parser.setContentHandler( &handler );
     parser.setErrorHandler( &handler );
 
-    parser.parse( fileName.c_str() );
+    std::ifstream is( fileName.c_str(), std::ios_base::in | std::ios_base::binary );
+    boost::iostreams::filtering_istream in;
+    in.push( boost::iostreams::bzip2_decompressor() );
+    in.push( is );
+
+    StreamIS sis( in );
+    parser.parse( sis );
 
     std::cout << "Done..." << std::endl;
 }

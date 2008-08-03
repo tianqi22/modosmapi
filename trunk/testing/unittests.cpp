@@ -369,15 +369,43 @@ void testQuadTree()
 }
 
 
+void testConstTagString()
+{
+    ConstTagString a( "One" );
+    ConstTagString b( "Two" );
+    ConstTagString c( "Three" );
+    ConstTagString d( "Four" );
+    ConstTagString e( "One" );
+    ConstTagString f( "Two" );
+
+    BOOST_CHECK_EQUAL( ConstTagString::numStrings(), 4 );
+
+    BOOST_CHECK_EQUAL( a, e );
+    BOOST_CHECK_EQUAL( b, f );
+
+    BOOST_ASSERT( a != b );
+    BOOST_ASSERT( a != c );
+    BOOST_ASSERT( a != d );
+
+    BOOST_CHECK_EQUAL( a, "One" );
+    BOOST_CHECK_EQUAL( b, "Two" );
+
+    BOOST_ASSERT( a != "Twelve" );
+
+    BOOST_CHECK_EQUAL( ConstTagString::numStrings(), 5 );
+}
+
 boost::unit_test::test_suite* init_unit_test_suite( int argc, char **argv )
 {
     boost::unit_test::test_suite *test = BOOST_TEST_SUITE( "Master test suite" );
 
-    test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
     test->add( BOOST_TEST_CASE( &testDbHandler ) );
     test->add( BOOST_TEST_CASE( &testSplitStruct ) );
     test->add( BOOST_TEST_CASE( &testOverlaps ) );
     test->add( BOOST_TEST_CASE( &testQuadTree ) );
+    test->add( BOOST_TEST_CASE( &testConstTagString ) );
+
+    test->add( BOOST_TEST_CASE( &xmlParseTestFn ) );
     //test->add( BOOST_TEST_CASE( &tempMapQuery ) );
     return test;
 }

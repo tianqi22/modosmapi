@@ -35,6 +35,8 @@ public:
 
     std::string toString() const;
 
+    static size_t numStrings() { return m_stringIndexMap.size(); }
+
 private:
     void assignString( const std::string &str );
 };

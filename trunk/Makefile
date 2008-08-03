@@ -13,7 +13,7 @@ Q           := $(if $(VERBOSE),,@)
 APACHE_CPPFLAGS := -I/usr/include/apache2 \
                    -I/usr/include/apr-1.0
 
-BOOST_LDLIBS      := -lboost_iostreams -lboost_date_time -lboost_regex
+BOOST_LDLIBS      := -lboost_iostreams -lboost_date_time -lboost_regex -lboost_system
 BOOST_TEST_LDLIBS := -lboost_unit_test_framework
 MYSQL_LDLIBS      := -lmysqlclient
 XERCES_LDLIBS     := -lxerces-c
@@ -34,7 +34,8 @@ CPPFLAGS    += $(APACHE_CPPFLAGS)
 #CXXFLAGS    += -Wall -Werror
 CXXFLAGS	+= -Wall
 CXXFLAGS    += -O2
-CXXFLAGS    += -fexceptions -finline-functions
+CXXFLAGS    += -fexceptions
+# -finline-functions
 CXXFLAGS    += -g
 
 
@@ -54,11 +55,12 @@ MODOSM_OBJECTS 		:= $(MODOSM_SOURCES:%.cpp=$(BUILD_DIR)/%.o) $(LIB_DIR)/osm_core
 UNIT_TEST_TARGET	:= $(BIN_DIR)/unittests
 UE_TARGET		    := $(BIN_DIR)/userextractor
 OSMCOMPARE_TARGET	:= $(BIN_DIR)/osmcompare
-ROUTEAPP_TARGET		:= $(BIN_DIR)/routeapp.o
+ROUTEAPP_TARGET		:= $(BIN_DIR)/routeapp
 ALL_TARGETS			+= $(MODOSM_TARGET)
 ALL_TARGETS			+= $(UNIT_TEST_TARGET)
 ALL_TARGETS			+= $(UE_TARGET)
 ALL_TARGETS			+= $(OSMCOMPARE_TARGET)
+ALL_TARGETS			+= $(ROUTEAPP_TARGET)
 -include $(MODOSM_OBJECTS:%.o=%.d)
 
 $(OSMCORE_TARGET)	: $(OSMCORE_OBJECTS)
@@ -93,6 +95,14 @@ $(OSMCOMPARE_TARGET)	: testing/osm_xml_compare.cpp $(OSMCORE_TARGET)
 	$(Q)$(ECHO)	" [LINK] $(@F)"
 	$(Q)$(MKDIR) $(@D)
 	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
+
+$(ROUTEAPP_TARGET)	: LDLIBS  := $(BOOST_LDLIBS) $(MYSQL_LDLIBS) $(XERCES_LDLIBS)
+$(ROUTEAPP_TARGET)	: LDFLAGS := -fPIC
+$(ROUTEAPP_TARGET)	: routeapp/routeapp.cpp $(OSMCORE_TARGET)
+	$(Q)$(ECHO)	" [LINK] $(@F)"
+	$(Q)$(MKDIR) $(@D)
+	$(Q)$(LINK.cpp) $^ $(LDLIBS) $(OUTPUT_OPTION)
+
 
 # Common compile rule
 $(BUILD_DIR)/%.o : %.cpp
