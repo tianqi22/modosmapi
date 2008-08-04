@@ -614,11 +614,11 @@ void RoutingGraph::calculateRoute( dbId_t sourceNodeId, dbId_t destNodeId, route
             dbId_t nodeFromId = routeSeg.get<2>();
             dbId_t nodeToId = routeSeg.get<3>();
 
-            std::cout << "WAY" << std::endl;
-            BOOST_FOREACH( const tagMap_t::value_type &v, theWay->getTags() )
-            {
-                std::cout << "  " << v.first << ": " << v.second << std::endl;
-            }
+            //std::cout << "WAY" << std::endl;
+            //BOOST_FOREACH( const tagMap_t::value_type &v, theWay->getTags() )
+            //{
+            //    std::cout << "  " << v.first << ": " << v.second << std::endl;
+            //}
             
             route.push_back( getNodeById( nodeFromId ) );
 
